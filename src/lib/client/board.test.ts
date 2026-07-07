@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { compareTasks } from './board.svelte';
+import { compareTasks, compareDone } from './board.svelte';
 import type { TaskDTO } from '$lib/types';
 
 function task(over: Partial<TaskDTO>): TaskDTO {
@@ -31,5 +31,30 @@ describe('compareTasks', () => {
 		const noDue = task({ createdAt: '2025-01-01T00:00:00.000Z' });
 		const sorted = [noDue, dueLater, low, dueSoon, urgent].sort(compareTasks);
 		expect(sorted).toEqual([urgent, low, dueSoon, dueLater, noDue]);
+	});
+});
+
+describe('compareDone', () => {
+	it('orders by most recently completed, falling back to createdAt', () => {
+		const older = task({
+			title: 'older',
+			status: 'Done',
+			completedAt: '2026-01-01T00:00:00.000Z',
+			priority: 'Super-High'
+		});
+		const newer = task({
+			title: 'newer',
+			status: 'Done',
+			completedAt: '2026-02-01T00:00:00.000Z',
+			priority: 'Low'
+		});
+		const noCompletedAt = task({
+			title: 'no-completed-at',
+			status: 'Done',
+			completedAt: null,
+			createdAt: '2026-03-01T00:00:00.000Z'
+		});
+		expect([older, newer].sort(compareDone)).toEqual([newer, older]);
+		expect([newer, noCompletedAt].sort(compareDone)).toEqual([noCompletedAt, newer]);
 	});
 });

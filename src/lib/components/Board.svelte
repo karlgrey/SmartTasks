@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import Column from './Column.svelte';
-	import { board } from '$lib/client/board.svelte';
+	import { board, compareDone } from '$lib/client/board.svelte';
 	import { STATUSES } from '$lib/types';
 
 	const filtered = $derived(board.filtered(page.url.searchParams));
@@ -9,7 +9,12 @@
 
 <div class="board">
 	{#each STATUSES as status (status)}
-		<Column {status} tasks={filtered.filter((t) => t.status === status)} />
+		<Column
+			{status}
+			tasks={status === 'Done'
+				? filtered.filter((t) => t.status === status).sort(compareDone)
+				: filtered.filter((t) => t.status === status)}
+		/>
 	{/each}
 </div>
 

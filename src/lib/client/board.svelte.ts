@@ -15,6 +15,12 @@ export function compareTasks(a: TaskDTO, b: TaskDTO): number {
 	return a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0;
 }
 
+export function compareDone(a: TaskDTO, b: TaskDTO): number {
+	const ka = a.completedAt ?? a.createdAt;
+	const kb = b.completedAt ?? b.createdAt;
+	return ka < kb ? 1 : ka > kb ? -1 : 0;
+}
+
 type InitData = {
 	user: UserDTO;
 	tasks: TaskDTO[];
