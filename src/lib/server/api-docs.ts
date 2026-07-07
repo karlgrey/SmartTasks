@@ -16,12 +16,13 @@ Task manager shared by humans and AI agents. Base URL: this host.
 ## Endpoints
 | Method & path | Purpose |
 |---|---|
-| GET /api/tasks | List. Query: assignee (user id or name), project (id), status, open=true (status ≠ Done), q (text search), limit, offset |
+| GET /api/tasks | List. Query: assignee (user id or name), project (id), location (id, matches the task's project location), status, open=true (status ≠ Done), q (text search), limit, offset |
 | POST /api/tasks | Create: {title, description?, status?, priority?, size?, hours?, dueDate?, assigneeId?, projectId?} |
 | GET /api/tasks/:id | Detail incl. comments |
 | PATCH /api/tasks/:id | Partial update (same fields as create) |
 | POST /api/tasks/:id/comments | Add comment: {body} |
-| GET /api/projects · POST /api/projects · PATCH /api/projects/:id | Projects: {name, color?, archived?} |
+| GET /api/projects · POST /api/projects · PATCH /api/projects/:id | Projects: {name, color?, archived?, locationId?, wikiRef?} |
+| GET /api/locations · POST /api/locations · PATCH /api/locations/:id | Locations: {name, archived?} |
 | GET /api/users | All users (id, name, type human/ai) |
 | GET /api/events | SSE stream of task changes |
 
@@ -29,4 +30,10 @@ Task manager shared by humans and AI agents. Base URL: this host.
 - status: Inbox | To Do | Icebox | In Progress | Supplier | Review | Done
 - priority: Super-High | High | Medium | Low — size: S | M | L
 - dueDate: YYYY-MM-DD. Errors: JSON {"error": "..."} with proper HTTP status.
+
+## Projects, locations & TheBrain2
+Projects and locations are maintained via this API only — there is no management UI.
+A project may carry a \`wikiRef\`: the page name of its knowledge page in the TheBrain2
+vault (\`wiki/projekte/<wikiRef>.md\`). When you work a task, read that page for project
+context if a wikiRef is set. Locations are physical places; each project has at most one.
 `;
