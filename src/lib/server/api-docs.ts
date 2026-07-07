@@ -22,7 +22,7 @@ Task manager shared by humans and AI agents. Base URL: this host.
 | PATCH /api/tasks/:id | Partial update (same fields as create) |
 | POST /api/tasks/:id/comments | Add comment: {body} |
 | GET /api/projects · POST /api/projects · PATCH /api/projects/:id | Projects: {name, color?, archived?, locationId?, wikiRef?} |
-| GET /api/locations · POST /api/locations · PATCH /api/locations/:id | Locations: {name, archived?} |
+| GET /api/locations · POST /api/locations · PATCH /api/locations/:id | Locations: create {name}, update {name?, archived?} |
 | GET /api/users | All users (id, name, type human/ai) |
 | GET /api/events | SSE stream of task changes |
 

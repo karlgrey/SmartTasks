@@ -20,6 +20,8 @@ test('mobile: status tabs, quick-add, status change via panel', async ({ page })
 
 	// open the sheet, move it to To Do via the Status select
 	await page.locator('.card', { hasText: 'Mobile capture' }).click();
+	const panelBox = await page.locator('.panel').boundingBox();
+	expect(panelBox?.width).toBe(390);
 	await page.getByLabel('Status').selectOption('To Do');
 	await page.keyboard.press('Escape');
 
