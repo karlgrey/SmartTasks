@@ -81,9 +81,8 @@ class BoardState {
 
 	async patchTask(id: number, patch: Partial<TaskDTO>) {
 		const i = this.tasks.findIndex((t) => t.id === id);
-		if (i === -1) return;
-		const before = this.tasks[i];
-		this.tasks[i] = { ...before, ...patch }; // optimistic
+		const before = i === -1 ? null : this.tasks[i];
+		if (before) this.tasks[i] = { ...before, ...patch }; // optimistic
 		try {
 			const saved = await api<TaskDTO>(`/api/tasks/${id}`, {
 				method: 'PATCH',
@@ -91,7 +90,7 @@ class BoardState {
 			});
 			this.upsert(saved);
 		} catch (e) {
-			this.upsert(before); // rollback
+			if (before) this.upsert(before); // rollback
 			this.toast((e as Error).message);
 		}
 	}
