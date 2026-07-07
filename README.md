@@ -1,42 +1,25 @@
-# sv
+# SmartTasks
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+Lean kanban task manager for humans and AI agents. SvelteKit + SQLite, one process.
 
-## Creating a project
+## Development
+	npm install
+	DATABASE_PATH=data/dev.db npm run seed   # once; prints passwords + Claude's API key
+	DATABASE_PATH=data/dev.db npm run dev
 
-If you're seeing this, you've probably already done this step. Congrats!
+## Tests
+	npm run test:unit
+	npm run test:e2e
 
-```sh
-# create a new project
-npx sv create my-app
-```
+## API
+Agents authenticate with `Authorization: Bearer <api-key>` — full guide at `/api/docs`.
+Issue/rotate a key: `npx tsx scripts/create-api-key.ts <user-name>`.
 
-To recreate this project with the same configuration:
+## Deploy (Fly.io)
+	fly launch --no-deploy          # once; creates the app, keep the generated name in fly.toml
+	fly volumes create smarttasks_data --size 1
+	fly secrets set LITESTREAM_REPLICA_URL=s3://<bucket>/smarttasks AWS_ACCESS_KEY_ID=… AWS_SECRET_ACCESS_KEY=…
+	fly deploy
+	fly ssh console -C "npm run seed"   # once, on the first deploy
 
-```sh
-# recreate this project
-npx sv@0.16.2 create --template minimal --types ts --install npm .
-```
-
-## Developing
-
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
-
-```sh
-npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
-```
-
-## Building
-
-To create a production version of your app:
-
-```sh
-npm run build
-```
-
-You can preview the production build with `npm run preview`.
-
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+Without `LITESTREAM_REPLICA_URL` the app runs fine but unreplicated (volume snapshots only).

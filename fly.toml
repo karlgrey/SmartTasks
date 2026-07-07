@@ -1,0 +1,18 @@
+app = "smarttasks"
+primary_region = "fra"
+
+[env]
+  DATABASE_PATH = "/data/smarttasks.db"
+  PORT = "3000"
+  ORIGIN = "https://smarttasks.fly.dev"
+
+[mounts]
+  source = "smarttasks_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = false      # SSE connections + snappiness: keep the machine warm
+  auto_start_machines = true
+  min_machines_running = 1
