@@ -14,6 +14,12 @@ describe('projects', () => {
 		expect(listProjects(db)).toHaveLength(1);
 		expect(() => updateProject(db, 99, { name: 'x' })).toThrowError('project not found');
 	});
+
+	it('returns the project unchanged on an empty patch', () => {
+		const db = testDb();
+		const p = createProject(db, { name: 'Website' });
+		expect(updateProject(db, p.id, {})).toEqual(p);
+	});
 });
 
 describe('listUsers', () => {

@@ -31,6 +31,7 @@ export function updateProject(
 	if (patch.name !== undefined) next.name = patch.name.trim();
 	if (patch.color !== undefined) next.color = patch.color;
 	if (patch.archived !== undefined) next.archived = patch.archived;
+	if (Object.keys(next).length === 0) return existing;
 	return db.update(projects).set(next).where(eq(projects.id, id)).returning().get();
 }
 
