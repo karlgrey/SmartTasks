@@ -1,4 +1,4 @@
-import type { TaskDTO, UserDTO, ProjectDTO } from '$lib/types';
+import type { TaskDTO, UserDTO, ProjectDTO, LocationDTO } from '$lib/types';
 import { api } from './api';
 
 const PRIORITY_ORDER: Record<string, number> = { 'Super-High': 0, High: 1, Medium: 2, Low: 3 };
@@ -27,6 +27,7 @@ type InitData = {
 	done: TaskDTO[];
 	users: UserDTO[];
 	projects: ProjectDTO[];
+	locations: LocationDTO[];
 };
 
 class BoardState {
@@ -34,6 +35,7 @@ class BoardState {
 	tasks = $state<TaskDTO[]>([]);
 	users = $state<UserDTO[]>([]);
 	projects = $state<ProjectDTO[]>([]);
+	locations = $state<LocationDTO[]>([]);
 	flashes = $state<Record<number, boolean>>({});
 	toasts = $state<{ id: number; message: string }[]>([]);
 	#toastId = 0;
@@ -43,22 +45,31 @@ class BoardState {
 		this.tasks = [...data.tasks, ...data.done];
 		this.users = data.users;
 		this.projects = data.projects;
+		this.locations = data.locations;
 	}
 
 	filtered(params: URLSearchParams): TaskDTO[] {
 		const assignee = params.get('assignee');
 		const project = params.get('project');
+		const location = params.get('location');
 		const q = params.get('q')?.toLowerCase();
 		return this.tasks
 			.filter(
 				(t) =>
 					(!assignee || String(t.assigneeId) === assignee) &&
 					(!project || String(t.projectId) === project) &&
+					(!location ||
+						this.projects.find((p) => p.id === t.projectId)?.locationId === Number(location)) &&
 					(!q ||
 						t.title.toLowerCase().includes(q) ||
 						t.description.toLowerCase().includes(q))
 			)
 			.sort(compareTasks);
+	}
+
+	projectLabel(p: ProjectDTO): string {
+		const loc = this.locations.find((l) => l.id === p.locationId);
+		return loc ? `${p.name} (${loc.name})` : p.name;
 	}
 
 	upsert(task: TaskDTO, opts: { flash?: boolean } = {}) {

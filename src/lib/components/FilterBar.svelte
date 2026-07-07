@@ -38,7 +38,13 @@
 	<select onchange={(e) => setParam('project', e.currentTarget.value || null)}>
 		<option value="">All projects</option>
 		{#each board.projects.filter((p) => !p.archived) as p (p.id)}
-			<option value={p.id} selected={current.get('project') === String(p.id)}>{p.name}</option>
+			<option value={p.id} selected={current.get('project') === String(p.id)}>{board.projectLabel(p)}</option>
+		{/each}
+	</select>
+	<select onchange={(e) => setParam('location', e.currentTarget.value || null)}>
+		<option value="">All locations</option>
+		{#each board.locations.filter((l) => !l.archived) as l (l.id)}
+			<option value={l.id} selected={current.get('location') === String(l.id)}>{l.name}</option>
 		{/each}
 	</select>
 	<input
