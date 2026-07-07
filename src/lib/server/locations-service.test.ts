@@ -21,4 +21,18 @@ describe('locations', () => {
 		expect(() => updateLocation(db, l.id, { name: ' ' })).toThrowError('name is required');
 		expect(updateLocation(db, l.id, {})).toEqual(l);
 	});
+
+	it('rejects duplicate names with a 400', () => {
+		const db = testDb();
+		createLocation(db, { name: 'Office' });
+		expect(() => createLocation(db, { name: ' Office ' })).toThrowError(
+			'location name already exists'
+		);
+		const other = createLocation(db, { name: 'Studio' });
+		expect(() => updateLocation(db, other.id, { name: 'Office' })).toThrowError(
+			'location name already exists'
+		);
+		// renaming to its own name is fine
+		expect(updateLocation(db, other.id, { name: 'Studio' }).name).toBe('Studio');
+	});
 });
