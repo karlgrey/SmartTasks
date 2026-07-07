@@ -58,4 +58,10 @@
 		color: var(--muted);
 		cursor: pointer;
 	}
+	@media (max-width: 767px) {
+		.column {
+			width: 100%;
+			min-width: 0;
+		}
+	}
 </style>

@@ -109,4 +109,10 @@
 		color: var(--muted);
 		cursor: pointer;
 	}
+	@media (max-width: 767px) {
+		nav {
+			flex-wrap: nowrap;
+			overflow-x: auto;
+		}
+	}
 </style>

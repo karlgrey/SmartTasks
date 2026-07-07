@@ -308,4 +308,18 @@
 		font-size: 12px;
 		color: var(--muted);
 	}
+	@media (max-width: 767px) {
+		.panel {
+			width: 100vw;
+			border-left: 0;
+		}
+		.fields {
+			grid-template-columns: 1fr;
+		}
+		select,
+		input[type='date'],
+		input[type='number'] {
+			min-height: 44px;
+		}
+	}
 </style>
