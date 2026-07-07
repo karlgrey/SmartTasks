@@ -24,7 +24,6 @@
 		"drizzle-kit": "^0.31.10",
 		"svelte": "^5.56.1",
 		"svelte-check": "^4.6.0",
-		"tsx": "^4.23.0",
 		"typescript": "^6.0.3",
 		"vite": "^8.0.16",
 		"vitest": "^4.1.10"
@@ -34,6 +33,7 @@
 		"better-sqlite3": "^12.11.1",
 		"dompurify": "^3.4.11",
 		"drizzle-orm": "^0.45.2",
-		"marked": "^18.0.5"
+		"marked": "^18.0.5",
+		"tsx": "^4.23.0"
 	}
 }

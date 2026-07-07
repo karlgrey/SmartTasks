@@ -4,3 +4,4 @@ data
 .e2e
 .git
 docs
+.env*

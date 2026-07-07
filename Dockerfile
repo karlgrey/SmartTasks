@@ -14,6 +14,8 @@ COPY --from=build /app/build ./build
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/package.json ./
 COPY --from=build /app/drizzle ./drizzle
+COPY --from=build /app/scripts ./scripts
+COPY --from=build /app/src ./src
 COPY litestream.yml /etc/litestream.yml
 COPY docker-entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh

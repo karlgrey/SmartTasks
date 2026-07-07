@@ -16,7 +16,7 @@ Agents authenticate with `Authorization: Bearer <api-key>` — full guide at `/a
 Issue/rotate a key: `npx tsx scripts/create-api-key.ts <user-name>`.
 
 ## Deploy (Fly.io)
-	fly launch --no-deploy          # once; creates the app, keep the generated name in fly.toml
+	fly launch --no-deploy          # once; creates the app, keep the generated name in fly.toml and update ORIGIN to match
 	fly volumes create smarttasks_data --size 1
 	fly secrets set LITESTREAM_REPLICA_URL=s3://<bucket>/smarttasks AWS_ACCESS_KEY_ID=… AWS_SECRET_ACCESS_KEY=…
 	fly deploy
