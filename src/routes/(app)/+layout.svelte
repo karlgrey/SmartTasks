@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import FilterBar from '$lib/components/FilterBar.svelte';
 	import Board from '$lib/components/Board.svelte';
 	import Toasts from '$lib/components/Toasts.svelte';
@@ -10,6 +11,8 @@
 	$effect.pre(() => {
 		board.init(data);
 	});
+
+	onMount(() => board.connectSse());
 </script>
 
 <FilterBar />

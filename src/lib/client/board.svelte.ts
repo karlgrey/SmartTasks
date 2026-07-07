@@ -108,8 +108,12 @@ class BoardState {
 		const es = new EventSource('/api/events');
 		let dropped = false;
 		es.onmessage = (m) => {
-			const e = JSON.parse(m.data);
-			if (e.task) this.upsert(e.task, { flash: true });
+			try {
+				const e = JSON.parse(m.data);
+				if (e.task) this.upsert(e.task, { flash: true });
+			} catch {
+				// ignore malformed events
+			}
 		};
 		es.onerror = () => {
 			dropped = true; // EventSource reconnects on its own
