@@ -1,0 +1,59 @@
+:root {
+	--bg: #f4f5f7;
+	--surface: #ffffff;
+	--border: #e2e4e9;
+	--text: #1f2328;
+	--muted: #6b7280;
+	--accent: #2563eb;
+	--danger: #dc2626;
+	--radius: 8px;
+	--shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+* {
+	box-sizing: border-box;
+}
+
+body {
+	margin: 0;
+	background: var(--bg);
+	color: var(--text);
+	font: 14px/1.45 system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+button,
+input,
+select,
+textarea {
+	font: inherit;
+	color: inherit;
+}
+
+.badge {
+	display: inline-block;
+	padding: 1px 6px;
+	border-radius: 999px;
+	font-size: 11px;
+	font-weight: 600;
+	background: #eceef2;
+	color: var(--muted);
+	white-space: nowrap;
+}
+
+.badge.prio-super-high { background: #f3e8ff; color: #7c3aed; }
+.badge.prio-high { background: #fee2e2; color: #dc2626; }
+.badge.prio-medium { background: #fef3c7; color: #b45309; }
+.badge.prio-low { background: #dcfce7; color: #15803d; }
+.badge.overdue { background: #fee2e2; color: #dc2626; }
+
+.avatar {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 20px;
+	height: 20px;
+	border-radius: 50%;
+	color: #fff;
+	font-size: 11px;
+	font-weight: 700;
+}
