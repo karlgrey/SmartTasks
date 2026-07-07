@@ -16,11 +16,19 @@ export type UserDTO = {
 	color: string;
 };
 
+export type LocationDTO = {
+	id: number;
+	name: string;
+	archived: boolean;
+};
+
 export type ProjectDTO = {
 	id: number;
 	name: string;
 	color: string;
 	archived: boolean;
+	locationId: number | null;
+	wikiRef: string | null;
 };
 
 export type TaskDTO = {

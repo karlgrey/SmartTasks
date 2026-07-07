@@ -21,11 +21,19 @@ export const sessions = sqliteTable('sessions', {
 	expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull()
 });
 
+export const locations = sqliteTable('locations', {
+	id: integer('id').primaryKey({ autoIncrement: true }),
+	name: text('name').notNull().unique(),
+	archived: integer('archived', { mode: 'boolean' }).notNull().default(false)
+});
+
 export const projects = sqliteTable('projects', {
 	id: integer('id').primaryKey({ autoIncrement: true }),
 	name: text('name').notNull(),
 	color: text('color').notNull().default('#6b7280'),
-	archived: integer('archived', { mode: 'boolean' }).notNull().default(false)
+	archived: integer('archived', { mode: 'boolean' }).notNull().default(false),
+	locationId: integer('location_id').references(() => locations.id),
+	wikiRef: text('wiki_ref')
 });
 
 export const tasks = sqliteTable('tasks', {
