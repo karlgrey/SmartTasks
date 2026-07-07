@@ -22,4 +22,12 @@ describe('addComment', () => {
 		expect(() => addComment(db, micha, t.id, '  ')).toThrowError('body is required');
 		expect(() => addComment(db, micha, 999, 'hi')).toThrowError('task not found');
 	});
+
+	it('rejects non-string bodies instead of throwing a TypeError', () => {
+		const db = testDb();
+		const { micha } = seedUsers(db);
+		const t = createTask(db, micha, { title: 'x' });
+		// @ts-expect-error invalid type on purpose
+		expect(() => addComment(db, micha, t.id, 5)).toThrowError('body is required');
+	});
 });

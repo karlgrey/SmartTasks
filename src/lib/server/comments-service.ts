@@ -11,7 +11,7 @@ export function addComment(
 	taskId: number,
 	body: string
 ): { comment: CommentDTO; task: TaskDTO } {
-	if (!body?.trim()) throw new ServiceError(400, 'body is required');
+	if (typeof body !== 'string' || !body.trim()) throw new ServiceError(400, 'body is required');
 	const existing = db.select().from(tasks).where(eq(tasks.id, taskId)).get();
 	if (!existing) throw new ServiceError(404, 'task not found');
 	const now = new Date().toISOString();

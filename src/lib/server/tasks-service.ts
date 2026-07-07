@@ -1,4 +1,4 @@
-import { and, eq, ne, or, like, sql, asc, type SQL } from 'drizzle-orm';
+import { and, eq, ne, or, like, sql, asc, desc, type SQL } from 'drizzle-orm';
 import type { Db } from './db';
 import { tasks, users, comments } from './db/schema';
 import { ServiceError } from './errors';
@@ -36,10 +36,24 @@ export function assertEnum<T extends string>(
 		throw new ServiceError(400, `invalid ${field}: must be one of ${allowed.join(', ')}`);
 }
 
+function assertType(field: string, value: unknown, type: 'string' | 'number'): void {
+	if (value !== null && value !== undefined && typeof value !== type)
+		throw new ServiceError(400, `invalid ${field}: must be a ${type}`);
+}
+
 function validateEnums(input: Partial<TaskInput>): void {
 	assertEnum('status', input.status, STATUSES);
 	assertEnum('priority', input.priority, PRIORITIES);
 	assertEnum('size', input.size, SIZES);
+}
+
+function validateTypes(input: Partial<TaskInput>): void {
+	assertType('title', input.title, 'string');
+	assertType('description', input.description, 'string');
+	assertType('dueDate', input.dueDate, 'string');
+	assertType('hours', input.hours, 'number');
+	assertType('assigneeId', input.assigneeId, 'number');
+	assertType('projectId', input.projectId, 'number');
 }
 
 const boardOrder = [
@@ -48,6 +62,8 @@ const boardOrder = [
 	tasks.dueDate,
 	tasks.createdAt
 ];
+
+const doneOrder = [sql`${tasks.completedAt} IS NULL`, desc(tasks.completedAt), desc(tasks.createdAt)];
 
 export function listTasks(db: Db, filters: TaskFilters = {}): TaskDTO[] {
 	const conds: SQL[] = [];
@@ -75,15 +91,18 @@ export function listTasks(db: Db, filters: TaskFilters = {}): TaskDTO[] {
 		.select()
 		.from(tasks)
 		.where(conds.length ? and(...conds) : undefined)
-		.orderBy(...boardOrder)
+		.orderBy(...(filters.status === 'Done' ? doneOrder : boardOrder))
 		.limit(filters.limit ?? -1)
 		.offset(filters.offset ?? 0)
 		.all();
 }
 
 export function createTask(db: Db, user: SafeUser, input: TaskInput): TaskDTO {
+	validateTypes(input);
 	if (!input.title?.trim()) throw new ServiceError(400, 'title is required');
 	validateEnums(input);
+	if (input.status === 'Done' && user.type === 'ai')
+		throw new ServiceError(403, 'AI users cannot set status to Done');
 	const now = new Date().toISOString();
 	return db
 		.insert(tasks)
@@ -99,7 +118,8 @@ export function createTask(db: Db, user: SafeUser, input: TaskInput): TaskDTO {
 			projectId: input.projectId ?? null,
 			createdBy: user.id,
 			createdAt: now,
-			updatedAt: now
+			updatedAt: now,
+			completedAt: input.status === 'Done' ? now : null
 		})
 		.returning()
 		.get();
@@ -148,6 +168,7 @@ export function updateTask(
 ): TaskDTO {
 	const existing = db.select().from(tasks).where(eq(tasks.id, id)).get();
 	if (!existing) throw new ServiceError(404, 'task not found');
+	validateTypes(patch);
 	validateEnums(patch);
 	if (patch.status === 'Done' && user.type === 'ai')
 		throw new ServiceError(403, 'AI users cannot set status to Done');

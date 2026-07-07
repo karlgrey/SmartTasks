@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
+import { eq } from 'drizzle-orm';
 import { listTasks, createTask, parseTaskFilters, getTask, updateTask } from './tasks-service';
 import { testDb, seedUsers } from './test-utils';
+import { tasks } from './db/schema';
 
 describe('createTask', () => {
 	it('creates with defaults and rejects empty titles and bad enums', () => {
@@ -13,6 +15,37 @@ describe('createTask', () => {
 		expect(() => createTask(db, micha, { title: '   ' })).toThrowError('title is required');
 		// @ts-expect-error invalid enum on purpose
 		expect(() => createTask(db, micha, { title: 'x', status: 'Doing' })).toThrowError();
+	});
+
+	it('forbids AI users from creating tasks directly in Done', () => {
+		const db = testDb();
+		const { claude } = seedUsers(db);
+		expect(() => createTask(db, claude, { title: 'x', status: 'Done' })).toThrowError(
+			'AI users cannot set status to Done'
+		);
+		expect(createTask(db, claude, { title: 'x', status: 'Review' }).status).toBe('Review');
+	});
+
+	it('stamps completedAt when created directly in Done', () => {
+		const db = testDb();
+		const { micha } = seedUsers(db);
+		const done = createTask(db, micha, { title: 'Already done', status: 'Done' });
+		expect(done.completedAt).not.toBeNull();
+		const open = createTask(db, micha, { title: 'Not done' });
+		expect(open.completedAt).toBeNull();
+	});
+
+	it('validates payload field types', () => {
+		const db = testDb();
+		const { micha } = seedUsers(db);
+		// @ts-expect-error invalid type on purpose
+		expect(() => createTask(db, micha, { title: 123 })).toThrowError(
+			'invalid title: must be a string'
+		);
+		expect(() =>
+			// @ts-expect-error invalid type on purpose
+			createTask(db, micha, { title: 'x', hours: 'abc' })
+		).toThrowError('invalid hours: must be a number');
 	});
 });
 
@@ -44,6 +77,16 @@ describe('listTasks', () => {
 		expect(listTasks(db, { q: 'urg' }).map((t) => t.title)).toEqual(['Urgent']);
 		expect(listTasks(db, { status: 'Done' }).map((t) => t.title)).toEqual(['Done already']);
 		expect(listTasks(db, { limit: 2 })).toHaveLength(2);
+	});
+
+	it('orders the Done column by most recently completed, not boardOrder', () => {
+		const db = testDb();
+		const { micha } = seedUsers(db);
+		const older = createTask(db, micha, { title: 'Older done', status: 'Done', priority: 'Super-High' });
+		const newer = createTask(db, micha, { title: 'Newer done', status: 'Done', priority: 'Low' });
+		db.update(tasks).set({ completedAt: '2026-01-01T00:00:00.000Z' }).where(eq(tasks.id, older.id)).run();
+		db.update(tasks).set({ completedAt: '2026-02-01T00:00:00.000Z' }).where(eq(tasks.id, newer.id)).run();
+		expect(listTasks(db, { status: 'Done', limit: 1 })[0].title).toBe('Newer done');
 	});
 });
 
@@ -111,5 +154,15 @@ describe('updateTask', () => {
 		});
 		expect(updated.createdBy).toBe(micha.id);
 		expect(() => updateTask(db, micha, 999, { title: 'x' })).toThrowError('task not found');
+	});
+
+	it('validates payload field types', () => {
+		const db = testDb();
+		const { micha } = seedUsers(db);
+		const t = createTask(db, micha, { title: 'x' });
+		expect(() =>
+			// @ts-expect-error invalid type on purpose
+			updateTask(db, micha, t.id, { hours: 'abc' })
+		).toThrowError('invalid hours: must be a number');
 	});
 });
