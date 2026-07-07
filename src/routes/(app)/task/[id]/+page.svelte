@@ -16,11 +16,17 @@
 	const id = $derived(Number(page.params.id));
 
 	$effect(() => {
-		api<Detail>(`/api/tasks/${id}`)
-			.then((d) => (detail = d))
+		const current = id;
+		detail = null;
+		api<Detail>(`/api/tasks/${current}`)
+			.then((d) => {
+				if (current === id) detail = d;
+			})
 			.catch((e) => {
-				board.toast((e as Error).message);
-				close();
+				if (current === id) {
+					board.toast((e as Error).message);
+					close();
+				}
 			});
 	});
 
@@ -54,12 +60,12 @@
 	const fmt = (iso: string) => iso.slice(0, 16).replace('T', ' ');
 </script>
 
+<svelte:window onkeydown={(e) => e.key === 'Escape' && close()} />
+
 <div
 	class="overlay"
 	onclick={close}
-	onkeydown={(e) => e.key === 'Escape' && close()}
-	role="button"
-	tabindex="-1"
+	role="presentation"
 	aria-label="Close panel"
 ></div>
 
