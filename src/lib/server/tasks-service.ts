@@ -1,6 +1,6 @@
 import { and, eq, ne, or, like, sql, asc, desc, type SQL } from 'drizzle-orm';
 import type { Db } from './db';
-import { tasks, users, comments } from './db/schema';
+import { tasks, users, comments, projects } from './db/schema';
 import { ServiceError } from './errors';
 import type { SafeUser } from './auth';
 import { STATUSES, PRIORITIES, SIZES, type Status, type Priority, type Size, type TaskDTO, type CommentDTO } from '$lib/types';
@@ -8,6 +8,7 @@ import { STATUSES, PRIORITIES, SIZES, type Status, type Priority, type Size, typ
 export type TaskFilters = {
 	assignee?: string;
 	project?: number;
+	location?: number;
 	status?: Status;
 	open?: boolean;
 	q?: string;
@@ -81,6 +82,10 @@ export function listTasks(db: Db, filters: TaskFilters = {}): TaskDTO[] {
 		}
 	}
 	if (filters.project !== undefined) conds.push(eq(tasks.projectId, filters.project));
+	if (filters.location !== undefined)
+		conds.push(
+			sql`${tasks.projectId} IN (SELECT ${projects.id} FROM ${projects} WHERE ${projects.locationId} = ${filters.location})`
+		);
 	if (filters.status) conds.push(eq(tasks.status, filters.status));
 	if (filters.open) conds.push(ne(tasks.status, 'Done'));
 	if (filters.q) {
@@ -131,6 +136,8 @@ export function parseTaskFilters(params: URLSearchParams): TaskFilters {
 	if (assignee) f.assignee = assignee;
 	const project = params.get('project');
 	if (project) f.project = Number(project);
+	const location = params.get('location');
+	if (location) f.location = Number(location);
 	const status = params.get('status');
 	if (status) f.status = status as Status;
 	if (params.get('open') === 'true') f.open = true;

@@ -3,6 +3,8 @@ import { eq } from 'drizzle-orm';
 import { listTasks, createTask, parseTaskFilters, getTask, updateTask } from './tasks-service';
 import { testDb, seedUsers } from './test-utils';
 import { tasks } from './db/schema';
+import { createLocation } from './locations-service';
+import { createProject } from './projects-service';
 
 describe('createTask', () => {
 	it('creates with defaults and rejects empty titles and bad enums', () => {
@@ -88,6 +90,20 @@ describe('listTasks', () => {
 		db.update(tasks).set({ completedAt: '2026-02-01T00:00:00.000Z' }).where(eq(tasks.id, newer.id)).run();
 		expect(listTasks(db, { status: 'Done', limit: 1 })[0].title).toBe('Newer done');
 	});
+
+	it('filters by location via the task project', () => {
+		const db = testDb();
+		const { micha } = seedUsers(db);
+		const schiff = createLocation(db, { name: 'Schiffmühle' });
+		const teich = createProject(db, { name: 'Teichbau', locationId: schiff.id });
+		const other = createProject(db, { name: 'Elsewhere' });
+		createTask(db, micha, { title: 'Teich ausheben', projectId: teich.id });
+		createTask(db, micha, { title: 'Other work', projectId: other.id });
+		createTask(db, micha, { title: 'No project' });
+		expect(listTasks(db, { location: schiff.id }).map((t) => t.title)).toEqual(['Teich ausheben']);
+		expect(listTasks(db, { location: schiff.id, open: true })).toHaveLength(1);
+		expect(listTasks(db, { location: 999 })).toEqual([]);
+	});
 });
 
 describe('parseTaskFilters', () => {
@@ -97,6 +113,10 @@ describe('parseTaskFilters', () => {
 		);
 		expect(f).toEqual({ assignee: 'claude', project: 3, open: true, q: 'wood', limit: 50, offset: 10 });
 		expect(parseTaskFilters(new URLSearchParams(''))).toEqual({});
+	});
+
+	it('parses the location param', () => {
+		expect(parseTaskFilters(new URLSearchParams('location=7'))).toEqual({ location: 7 });
 	});
 });
 
