@@ -7,24 +7,30 @@ export const GET: RequestHandler = ({ locals }) =>
 		requireUser(locals);
 		let unsubscribe: () => void = () => {};
 		let ping: ReturnType<typeof setInterval> | undefined;
+		let closed = false;
+		const cleanup = () => {
+			closed = true;
+			unsubscribe();
+			if (ping) clearInterval(ping);
+		};
 		const stream = new ReadableStream({
 			start(controller) {
 				const encoder = new TextEncoder();
 				const send = (chunk: string) => {
+					if (closed) return;
 					try {
 						controller.enqueue(encoder.encode(chunk));
 					} catch {
-						unsubscribe();
-						clearInterval(ping);
+						cleanup();
 					}
 				};
 				send(': connected\n\n');
+				if (closed) return;
 				unsubscribe = subscribe((e) => send(`data: ${JSON.stringify(e)}\n\n`));
 				ping = setInterval(() => send(': ping\n\n'), 25000);
 			},
 			cancel() {
-				unsubscribe();
-				clearInterval(ping);
+				cleanup();
 			}
 		});
 		return new Response(stream, {
