@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { listTasks, createTask, parseTaskFilters } from './tasks-service';
+import { listTasks, createTask, parseTaskFilters, getTask, updateTask } from './tasks-service';
 import { testDb, seedUsers } from './test-utils';
 
 describe('createTask', () => {
@@ -54,5 +54,62 @@ describe('parseTaskFilters', () => {
 		);
 		expect(f).toEqual({ assignee: 'claude', project: 3, open: true, q: 'wood', limit: 50, offset: 10 });
 		expect(parseTaskFilters(new URLSearchParams(''))).toEqual({});
+	});
+});
+
+describe('getTask', () => {
+	it('returns task with comments, 404 otherwise', () => {
+		const db = testDb();
+		const { micha } = seedUsers(db);
+		const t = createTask(db, micha, { title: 'With comments' });
+		expect(getTask(db, t.id)).toEqual({ ...t, comments: [] });
+		expect(() => getTask(db, 999)).toThrowError('task not found');
+	});
+});
+
+describe('updateTask', () => {
+	it('updates fields and bumps updatedAt', () => {
+		const db = testDb();
+		const { micha } = seedUsers(db);
+		const t = createTask(db, micha, { title: 'Old' });
+		const updated = updateTask(db, micha, t.id, { title: 'New', priority: 'High', hours: 2.5 });
+		expect(updated.title).toBe('New');
+		expect(updated.priority).toBe('High');
+		expect(updated.hours).toBe(2.5);
+		expect(updated.updatedAt >= t.updatedAt).toBe(true);
+	});
+
+	it('forbids AI users from setting Done', () => {
+		const db = testDb();
+		const { micha, claude } = seedUsers(db);
+		const t = createTask(db, micha, { title: 'AI task', assigneeId: claude.id });
+		expect(() => updateTask(db, claude, t.id, { status: 'Done' })).toThrowError(
+			'AI users cannot set status to Done'
+		);
+		expect(updateTask(db, claude, t.id, { status: 'Review' }).status).toBe('Review');
+		expect(updateTask(db, micha, t.id, { status: 'Done' }).status).toBe('Done');
+	});
+
+	it('stamps and clears completedAt on Done transitions', () => {
+		const db = testDb();
+		const { micha } = seedUsers(db);
+		const t = createTask(db, micha, { title: 'Finish me' });
+		const done = updateTask(db, micha, t.id, { status: 'Done' });
+		expect(done.completedAt).not.toBeNull();
+		const reopened = updateTask(db, micha, t.id, { status: 'To Do' });
+		expect(reopened.completedAt).toBeNull();
+	});
+
+	it('ignores non-updatable fields and 404s on missing tasks', () => {
+		const db = testDb();
+		const { micha } = seedUsers(db);
+		const t = createTask(db, micha, { title: 'Locked fields' });
+		const updated = updateTask(db, micha, t.id, {
+			title: 'Ok',
+			// @ts-expect-error createdBy must be ignored
+			createdBy: 999
+		});
+		expect(updated.createdBy).toBe(micha.id);
+		expect(() => updateTask(db, micha, 999, { title: 'x' })).toThrowError('task not found');
 	});
 });

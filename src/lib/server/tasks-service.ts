@@ -1,9 +1,9 @@
-import { and, eq, ne, or, like, sql, type SQL } from 'drizzle-orm';
+import { and, eq, ne, or, like, sql, asc, type SQL } from 'drizzle-orm';
 import type { Db } from './db';
-import { tasks, users } from './db/schema';
+import { tasks, users, comments } from './db/schema';
 import { ServiceError } from './errors';
 import type { SafeUser } from './auth';
-import { STATUSES, PRIORITIES, SIZES, type Status, type Priority, type Size, type TaskDTO } from '$lib/types';
+import { STATUSES, PRIORITIES, SIZES, type Status, type Priority, type Size, type TaskDTO, type CommentDTO } from '$lib/types';
 
 export type TaskFilters = {
 	assignee?: string;
@@ -121,4 +121,45 @@ export function parseTaskFilters(params: URLSearchParams): TaskFilters {
 	const offset = params.get('offset');
 	if (offset) f.offset = Number(offset);
 	return f;
+}
+
+export function getTask(db: Db, id: number): TaskDTO & { comments: CommentDTO[] } {
+	const task = db.select().from(tasks).where(eq(tasks.id, id)).get();
+	if (!task) throw new ServiceError(404, 'task not found');
+	const taskComments = db
+		.select()
+		.from(comments)
+		.where(eq(comments.taskId, id))
+		.orderBy(asc(comments.createdAt))
+		.all();
+	return { ...task, comments: taskComments };
+}
+
+const UPDATABLE = [
+	'title', 'description', 'status', 'priority', 'size', 'hours',
+	'dueDate', 'assigneeId', 'projectId'
+] as const;
+
+export function updateTask(
+	db: Db,
+	user: SafeUser,
+	id: number,
+	patch: Partial<TaskInput>
+): TaskDTO {
+	const existing = db.select().from(tasks).where(eq(tasks.id, id)).get();
+	if (!existing) throw new ServiceError(404, 'task not found');
+	validateEnums(patch);
+	if (patch.status === 'Done' && user.type === 'ai')
+		throw new ServiceError(403, 'AI users cannot set status to Done');
+	if (patch.title !== undefined && !patch.title.trim())
+		throw new ServiceError(400, 'title is required');
+
+	const next: Record<string, unknown> = { updatedAt: new Date().toISOString() };
+	for (const key of UPDATABLE) {
+		if (key in patch) next[key] = patch[key];
+	}
+	if (patch.status && patch.status !== existing.status) {
+		next.completedAt = patch.status === 'Done' ? new Date().toISOString() : null;
+	}
+	return db.update(tasks).set(next).where(eq(tasks.id, id)).returning().get();
 }
