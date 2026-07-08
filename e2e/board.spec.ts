@@ -37,4 +37,13 @@ test('login → quick-add → drag → detail → comment', async ({ page }) => 
 	// scoped to .comments: the page footer also contains "Created by Micha · ..." which would
 	// otherwise make a bare page.getByText('Micha ·') ambiguous (strict-mode violation)
 	await expect(page.locator('.comments').getByText('Micha ·')).toBeVisible();
+
+	// status history is visible with actor
+	await expect(page.locator('.task-id')).toHaveText(/#\d+/);
+	await expect(page.locator('.history').getByText('→ In Progress')).toBeVisible();
+
+	// delete: two-step confirm, card disappears
+	await page.getByRole('button', { name: 'Delete task' }).click();
+	await page.getByRole('button', { name: 'Really delete?' }).click();
+	await expect(page.locator('.card', { hasText: 'Order the wood' })).toHaveCount(0);
 });
