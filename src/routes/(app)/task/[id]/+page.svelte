@@ -13,6 +13,7 @@
 	let commentBody = $state('');
 	let editingDescription = $state(false);
 	let confirmDelete = $state(false);
+	let closing = $state(false);
 
 	const id = $derived(Number(page.params.id));
 
@@ -26,6 +27,7 @@
 		const current = id;
 		detail = null;
 		confirmDelete = false;
+		closing = false;
 		api<Detail>(`/api/tasks/${current}`)
 			.then((d) => {
 				if (current === id) detail = d;
@@ -38,8 +40,14 @@
 			});
 	});
 
+	// Remote-delete signal. Guards matter: `closing` makes this run-once — close()
+	// reads page.url, which otherwise becomes a dependency of this effect, and every
+	// navigation attempt re-runs it while the condition still holds (toast flood +
+	// navigation loop). Consuming the signal keeps it from lingering in the store.
 	$effect(() => {
-		if (board.lastDeletedId === id) {
+		if (!closing && board.lastDeletedId === id) {
+			closing = true;
+			board.lastDeletedId = null;
 			board.toast('Task was deleted');
 			close();
 		}
@@ -229,7 +237,10 @@
 						confirmDelete = true;
 						return;
 					}
-					if (await board.deleteTask(id)) close();
+					if (await board.deleteTask(id)) {
+						closing = true; // self-delete: suppress the remote-delete effect during unmount
+						close();
+					}
 				}}
 			>
 				{confirmDelete ? 'Really delete?' : 'Delete task'}

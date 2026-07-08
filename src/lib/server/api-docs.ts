@@ -29,7 +29,7 @@ Task manager shared by humans and AI agents. Base URL: this host.
 | GET /api/events | SSE stream of task changes |
 
 ## Values
-- status: Inbox | To Do | Icebox | In Progress | Supplier | Review | Done
+- status: Inbox | To Do | In Progress | Supplier | Review | Done | Icebox
 - priority: Super-High | High | Medium | Low — size: S | M | L
 - dueDate: YYYY-MM-DD. Errors: JSON {"error": "..."} with proper HTTP status.
 

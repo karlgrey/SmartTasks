@@ -46,4 +46,10 @@ test('login → quick-add → drag → detail → comment', async ({ page }) => 
 	await page.getByRole('button', { name: 'Delete task' }).click();
 	await page.getByRole('button', { name: 'Really delete?' }).click();
 	await expect(page.locator('.card', { hasText: 'Order the wood' })).toHaveCount(0);
+
+	// regression: the deleting session's own SSE echo must not re-trigger the
+	// panel's delete effect (caused a toast flood + navigation loop in v1.2)
+	await page.waitForTimeout(1500);
+	await expect(page.locator('.toast')).toHaveCount(0);
+	await expect(page).toHaveURL(/\/(\?.*)?$/);
 });

@@ -1,5 +1,6 @@
+// Order = board column order (and select/tab order). Icebox deliberately last.
 export const STATUSES = [
-	'Inbox', 'To Do', 'Icebox', 'In Progress', 'Supplier', 'Review', 'Done'
+	'Inbox', 'To Do', 'In Progress', 'Supplier', 'Review', 'Done', 'Icebox'
 ] as const;
 export const PRIORITIES = ['Super-High', 'High', 'Medium', 'Low'] as const;
 export const SIZES = ['S', 'M', 'L'] as const;
