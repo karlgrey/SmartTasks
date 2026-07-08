@@ -38,6 +38,13 @@
 			});
 	});
 
+	$effect(() => {
+		if (board.lastDeletedId === id) {
+			board.toast('Task was deleted');
+			close();
+		}
+	});
+
 	function close() {
 		goto(`/${page.url.search}`, { noScroll: true });
 	}
@@ -46,6 +53,14 @@
 		await board.patchTask(id, patch);
 		const saved = board.tasks.find((t) => t.id === id);
 		if (detail && saved) detail = { ...detail, ...saved };
+		if ('status' in patch) {
+			const current = id;
+			api<Detail>(`/api/tasks/${current}`)
+				.then((d) => {
+					if (current === id) detail = d;
+				})
+				.catch(() => {});
+		}
 	}
 
 	async function addComment(e: SubmitEvent) {
@@ -198,6 +213,9 @@
 		<footer class="meta">
 			<div>Created by {userName(detail.createdBy)} · {fmt(detail.createdAt)}</div>
 			<div class="history">
+				{#if detail.statusEvents.length === 0 && detail.completedAt}
+					<div>Completed · {fmt(detail.completedAt)}</div>
+				{/if}
 				{#each detail.statusEvents as ev (ev.id)}
 					<div>
 						{ev.fromStatus ? `${ev.fromStatus} → ` : '→ '}{ev.toStatus} · {userName(ev.userId)} · {fmt(ev.createdAt)}
@@ -339,10 +357,6 @@
 		color: #fff;
 		cursor: pointer;
 	}
-	.meta {
-		font-size: 12px;
-		color: var(--muted);
-	}
 	.task-id {
 		color: var(--muted);
 		font-size: 13px;
@@ -356,6 +370,8 @@
 		color: var(--muted);
 	}
 	.meta {
+		font-size: 12px;
+		color: var(--muted);
 		display: grid;
 		gap: 6px;
 		justify-items: start;

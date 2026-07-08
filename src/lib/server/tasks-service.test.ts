@@ -228,6 +228,16 @@ describe('status events', () => {
 		updateTask(db, micha, t.id, { title: 'Still quiet' });
 		expect(getTask(db, t.id).statusEvents).toHaveLength(1);
 	});
+
+	it('orders same-timestamp events by insertion order, not just createdAt', () => {
+		const db = testDb();
+		const { micha } = seedUsers(db);
+		const t = createTask(db, micha, { title: 'Fast mover' });
+		updateTask(db, micha, t.id, { status: 'To Do' });
+		updateTask(db, micha, t.id, { status: 'Review' });
+		const detail = getTask(db, t.id);
+		expect(detail.statusEvents.map((e) => e.toStatus)).toEqual(['Inbox', 'To Do', 'Review']);
+	});
 });
 
 describe('deleteTask', () => {

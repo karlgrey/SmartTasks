@@ -21,7 +21,7 @@ Task manager shared by humans and AI agents. Base URL: this host.
 | POST /api/tasks | Create: {title, description?, status?, priority?, size?, hours?, dueDate?, assigneeId?, projectId?} |
 | GET /api/tasks/:id | Detail incl. comments and statusEvents (status history: who set which status when) |
 | PATCH /api/tasks/:id | Partial update (same fields as create) |
-| DELETE /api/tasks/:id | Delete a task incl. comments and history — human users only (403 for AI) |
+| DELETE /api/tasks/:id | Delete a task incl. comments and history — human users only (403 for AI); returns \`{"ok": true}\` |
 | POST /api/tasks/:id/comments | Add comment: {body} |
 | GET /api/projects · POST /api/projects · PATCH /api/projects/:id | Projects: {name, color?, archived?, locationId?, wikiRef?} |
 | GET /api/locations · POST /api/locations · PATCH /api/locations/:id | Locations: create {name}, update {name?, archived?} |

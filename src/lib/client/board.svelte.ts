@@ -37,6 +37,7 @@ class BoardState {
 	projects = $state<ProjectDTO[]>([]);
 	locations = $state<LocationDTO[]>([]);
 	flashes = $state<Record<number, boolean>>({});
+	lastDeletedId = $state<number | null>(null);
 	toasts = $state<{ id: number; message: string }[]>([]);
 	#toastId = 0;
 
@@ -114,6 +115,7 @@ class BoardState {
 		try {
 			await api<{ ok: boolean }>(`/api/tasks/${id}`, { method: 'DELETE' });
 			this.remove(id);
+			this.lastDeletedId = id;
 			return true;
 		} catch (e) {
 			this.toast((e as Error).message);
@@ -141,7 +143,10 @@ class BoardState {
 		es.onmessage = (m) => {
 			try {
 				const e = JSON.parse(m.data);
-				if (e.type === 'task.deleted' && e.task) this.remove(e.task.id);
+				if (e.type === 'task.deleted' && e.task) {
+					this.remove(e.task.id);
+					this.lastDeletedId = e.task.id;
+				}
 				else if (e.task) this.upsert(e.task, { flash: true });
 			} catch {
 				// ignore malformed events

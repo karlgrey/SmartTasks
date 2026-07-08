@@ -109,29 +109,31 @@ export function createTask(db: Db, user: SafeUser, input: TaskInput): TaskDTO {
 	if (input.status === 'Done' && user.type === 'ai')
 		throw new ServiceError(403, 'AI users cannot set status to Done');
 	const now = new Date().toISOString();
-	const task = db
-		.insert(tasks)
-		.values({
-			title: input.title.trim(),
-			description: input.description ?? '',
-			status: input.status ?? 'Inbox',
-			priority: input.priority ?? null,
-			size: input.size ?? null,
-			hours: input.hours ?? null,
-			dueDate: input.dueDate ?? null,
-			assigneeId: input.assigneeId ?? null,
-			projectId: input.projectId ?? null,
-			createdBy: user.id,
-			createdAt: now,
-			updatedAt: now,
-			completedAt: input.status === 'Done' ? now : null
-		})
-		.returning()
-		.get();
-	db.insert(statusEvents)
-		.values({ taskId: task.id, userId: user.id, fromStatus: null, toStatus: task.status, createdAt: now })
-		.run();
-	return task;
+	return db.transaction((tx) => {
+		const task = tx
+			.insert(tasks)
+			.values({
+				title: input.title.trim(),
+				description: input.description ?? '',
+				status: input.status ?? 'Inbox',
+				priority: input.priority ?? null,
+				size: input.size ?? null,
+				hours: input.hours ?? null,
+				dueDate: input.dueDate ?? null,
+				assigneeId: input.assigneeId ?? null,
+				projectId: input.projectId ?? null,
+				createdBy: user.id,
+				createdAt: now,
+				updatedAt: now,
+				completedAt: input.status === 'Done' ? now : null
+			})
+			.returning()
+			.get();
+		tx.insert(statusEvents)
+			.values({ taskId: task.id, userId: user.id, fromStatus: null, toStatus: task.status, createdAt: now })
+			.run();
+		return task;
+	});
 }
 
 export function parseTaskFilters(params: URLSearchParams): TaskFilters {
@@ -167,7 +169,7 @@ export function getTask(db: Db, id: number): TaskDTO & { comments: CommentDTO[];
 		.select()
 		.from(statusEvents)
 		.where(eq(statusEvents.taskId, id))
-		.orderBy(asc(statusEvents.createdAt))
+		.orderBy(asc(statusEvents.createdAt), asc(statusEvents.id))
 		.all();
 	return { ...task, comments: taskComments, statusEvents: events };
 }
@@ -201,12 +203,14 @@ export function updateTask(
 	if (statusChanged) {
 		next.completedAt = patch.status === 'Done' ? now : null;
 	}
-	const task = db.update(tasks).set(next).where(eq(tasks.id, id)).returning().get();
-	if (statusChanged)
-		db.insert(statusEvents)
-			.values({ taskId: id, userId: user.id, fromStatus: existing.status, toStatus: patch.status!, createdAt: now })
-			.run();
-	return task;
+	return db.transaction((tx) => {
+		const task = tx.update(tasks).set(next).where(eq(tasks.id, id)).returning().get();
+		if (statusChanged)
+			tx.insert(statusEvents)
+				.values({ taskId: id, userId: user.id, fromStatus: existing.status, toStatus: patch.status!, createdAt: now })
+				.run();
+		return task;
+	});
 }
 
 export function deleteTask(db: Db, user: SafeUser, id: number): TaskDTO {
