@@ -106,8 +106,9 @@ export function createTask(db: Db, user: SafeUser, input: TaskInput): TaskDTO {
 	validateTypes(input);
 	if (!input.title?.trim()) throw new ServiceError(400, 'title is required');
 	validateEnums(input);
-	if (input.status === 'Done' && user.type === 'ai')
-		throw new ServiceError(403, 'AI users cannot set status to Done');
+	// AI users may create tasks directly in Done: they are the creator
+	// (retroactive work documentation). Setting Done on OTHERS' tasks stays
+	// forbidden — see updateTask.
 	const now = new Date().toISOString();
 	return db.transaction((tx) => {
 		const task = tx
@@ -189,8 +190,8 @@ export function updateTask(
 	if (!existing) throw new ServiceError(404, 'task not found');
 	validateTypes(patch);
 	validateEnums(patch);
-	if (patch.status === 'Done' && user.type === 'ai')
-		throw new ServiceError(403, 'AI users cannot set status to Done');
+	if (patch.status === 'Done' && user.type === 'ai' && existing.createdBy !== user.id)
+		throw new ServiceError(403, 'AI users can only set Done on tasks they created');
 	if (patch.title !== undefined && !patch.title.trim())
 		throw new ServiceError(400, 'title is required');
 

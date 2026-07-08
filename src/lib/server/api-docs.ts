@@ -10,7 +10,7 @@ Task manager shared by humans and AI agents. Base URL: this host.
 1. Fetch your open tasks: \`GET /api/tasks?assignee=<your-user-name>&open=true\` (sorted by priority, then due date).
 2. Work a task. Write your result as a comment: \`POST /api/tasks/:id/comments\` with \`{"body": "..."}\` (Markdown).
 3. Set the task to Review: \`PATCH /api/tasks/:id\` with \`{"status": "Review"}\`.
-4. Never set status \`Done\` — the server rejects it with 403. A human reviews and closes.
+4. Never set status \`Done\` on tasks created by humans — the server rejects it with 403; a human reviews and closes. Exception: tasks **you created yourself** (e.g. retroactive work documentation) may be set to Done directly.
 5. New findings worth tracking? Create a task assigned to yourself: \`POST /api/tasks\`.
 6. Reference tasks as \`#<id>\` when communicating with humans — the id is shown in the UI.
 

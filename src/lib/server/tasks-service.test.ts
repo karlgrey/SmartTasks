@@ -20,12 +20,12 @@ describe('createTask', () => {
 		expect(() => createTask(db, micha, { title: 'x', status: 'Doing' })).toThrowError();
 	});
 
-	it('forbids AI users from creating tasks directly in Done', () => {
+	it('allows AI users to create tasks directly in Done (creator rule)', () => {
 		const db = testDb();
 		const { claude } = seedUsers(db);
-		expect(() => createTask(db, claude, { title: 'x', status: 'Done' })).toThrowError(
-			'AI users cannot set status to Done'
-		);
+		const doc = createTask(db, claude, { title: 'x', status: 'Done' });
+		expect(doc.status).toBe('Done');
+		expect(doc.completedAt).not.toBeNull();
 		expect(createTask(db, claude, { title: 'x', status: 'Review' }).status).toBe('Review');
 	});
 
@@ -155,10 +155,19 @@ describe('updateTask', () => {
 		const { micha, claude } = seedUsers(db);
 		const t = createTask(db, micha, { title: 'AI task', assigneeId: claude.id });
 		expect(() => updateTask(db, claude, t.id, { status: 'Done' })).toThrowError(
-			'AI users cannot set status to Done'
+			'AI users can only set Done on tasks they created'
 		);
 		expect(updateTask(db, claude, t.id, { status: 'Review' }).status).toBe('Review');
 		expect(updateTask(db, micha, t.id, { status: 'Done' }).status).toBe('Done');
+	});
+
+	it('lets AI users set Done on tasks they created themselves, regardless of assignee', () => {
+		const db = testDb();
+		const { micha, claude } = seedUsers(db);
+		const doc = createTask(db, claude, { title: '[Doku] sent mail', assigneeId: micha.id });
+		const done = updateTask(db, claude, doc.id, { status: 'Done' });
+		expect(done.status).toBe('Done');
+		expect(done.assigneeId).toBe(micha.id);
 	});
 
 	it('stamps and clears completedAt on Done transitions', () => {
