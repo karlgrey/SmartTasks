@@ -154,7 +154,7 @@
 					onchange={(e) => save({ projectId: e.currentTarget.value ? Number(e.currentTarget.value) : null })}
 				>
 					<option value="">—</option>
-					{#each board.projects.filter((p) => !p.archived) as p (p.id)}<option value={p.id}>{board.projectLabel(p)}</option>{/each}
+					{#each board.projects.filter((p) => !p.archived) as p (p.id)}<option value={p.id}>{p.name}</option>{/each}
 				</select>
 			</label>
 			<label>Location

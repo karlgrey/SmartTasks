@@ -68,11 +68,6 @@ class BoardState {
 			.sort(compareTasks);
 	}
 
-	projectLabel(p: ProjectDTO): string {
-		const loc = this.locations.find((l) => l.id === p.locationId);
-		return loc ? `${p.name} (${loc.name})` : p.name;
-	}
-
 	upsert(task: TaskDTO, opts: { flash?: boolean } = {}) {
 		const i = this.tasks.findIndex((t) => t.id === task.id);
 		if (i === -1) this.tasks.push(task);

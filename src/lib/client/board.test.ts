@@ -59,8 +59,8 @@ describe('compareDone', () => {
 	});
 });
 
-describe('location filter and labels', () => {
-	it('filters by the project location and labels projects', () => {
+describe('location filter', () => {
+	it('filters by the project location', () => {
 		board.init({
 			user: { id: 1, name: 'M', email: null, type: 'human', color: '#fff' },
 			tasks: [
@@ -77,7 +77,5 @@ describe('location filter and labels', () => {
 			locations: [{ id: 5, name: 'Schiffmühle', archived: false }]
 		});
 		expect(board.filtered(new URLSearchParams('location=5')).map((t) => t.id)).toEqual([1]);
-		expect(board.projectLabel(board.projects[0])).toBe('Teichbau (Schiffmühle)');
-		expect(board.projectLabel(board.projects[1])).toBe('Elsewhere');
 	});
 });
