@@ -1,9 +1,9 @@
 import { and, eq, ne, or, like, sql, asc, desc, type SQL } from 'drizzle-orm';
 import type { Db } from './db';
-import { tasks, users, comments, projects } from './db/schema';
+import { tasks, users, comments, projects, statusEvents } from './db/schema';
 import { ServiceError } from './errors';
 import type { SafeUser } from './auth';
-import { STATUSES, PRIORITIES, SIZES, type Status, type Priority, type Size, type TaskDTO, type CommentDTO } from '$lib/types';
+import { STATUSES, PRIORITIES, SIZES, type Status, type Priority, type Size, type TaskDTO, type CommentDTO, type StatusEventDTO } from '$lib/types';
 
 export type TaskFilters = {
 	assignee?: string;
@@ -109,7 +109,7 @@ export function createTask(db: Db, user: SafeUser, input: TaskInput): TaskDTO {
 	if (input.status === 'Done' && user.type === 'ai')
 		throw new ServiceError(403, 'AI users cannot set status to Done');
 	const now = new Date().toISOString();
-	return db
+	const task = db
 		.insert(tasks)
 		.values({
 			title: input.title.trim(),
@@ -128,6 +128,10 @@ export function createTask(db: Db, user: SafeUser, input: TaskInput): TaskDTO {
 		})
 		.returning()
 		.get();
+	db.insert(statusEvents)
+		.values({ taskId: task.id, userId: user.id, fromStatus: null, toStatus: task.status, createdAt: now })
+		.run();
+	return task;
 }
 
 export function parseTaskFilters(params: URLSearchParams): TaskFilters {
@@ -150,7 +154,7 @@ export function parseTaskFilters(params: URLSearchParams): TaskFilters {
 	return f;
 }
 
-export function getTask(db: Db, id: number): TaskDTO & { comments: CommentDTO[] } {
+export function getTask(db: Db, id: number): TaskDTO & { comments: CommentDTO[]; statusEvents: StatusEventDTO[] } {
 	const task = db.select().from(tasks).where(eq(tasks.id, id)).get();
 	if (!task) throw new ServiceError(404, 'task not found');
 	const taskComments = db
@@ -159,7 +163,13 @@ export function getTask(db: Db, id: number): TaskDTO & { comments: CommentDTO[] 
 		.where(eq(comments.taskId, id))
 		.orderBy(asc(comments.createdAt))
 		.all();
-	return { ...task, comments: taskComments };
+	const events = db
+		.select()
+		.from(statusEvents)
+		.where(eq(statusEvents.taskId, id))
+		.orderBy(asc(statusEvents.createdAt))
+		.all();
+	return { ...task, comments: taskComments, statusEvents: events };
 }
 
 const UPDATABLE = [
@@ -182,12 +192,31 @@ export function updateTask(
 	if (patch.title !== undefined && !patch.title.trim())
 		throw new ServiceError(400, 'title is required');
 
-	const next: Record<string, unknown> = { updatedAt: new Date().toISOString() };
+	const now = new Date().toISOString();
+	const next: Record<string, unknown> = { updatedAt: now };
 	for (const key of UPDATABLE) {
 		if (key in patch) next[key] = patch[key];
 	}
-	if (patch.status && patch.status !== existing.status) {
-		next.completedAt = patch.status === 'Done' ? new Date().toISOString() : null;
+	const statusChanged = !!patch.status && patch.status !== existing.status;
+	if (statusChanged) {
+		next.completedAt = patch.status === 'Done' ? now : null;
 	}
-	return db.update(tasks).set(next).where(eq(tasks.id, id)).returning().get();
+	const task = db.update(tasks).set(next).where(eq(tasks.id, id)).returning().get();
+	if (statusChanged)
+		db.insert(statusEvents)
+			.values({ taskId: id, userId: user.id, fromStatus: existing.status, toStatus: patch.status!, createdAt: now })
+			.run();
+	return task;
+}
+
+export function deleteTask(db: Db, user: SafeUser, id: number): TaskDTO {
+	const existing = db.select().from(tasks).where(eq(tasks.id, id)).get();
+	if (!existing) throw new ServiceError(404, 'task not found');
+	if (user.type === 'ai') throw new ServiceError(403, 'AI users cannot delete tasks');
+	db.transaction((tx) => {
+		tx.delete(comments).where(eq(comments.taskId, id)).run();
+		tx.delete(statusEvents).where(eq(statusEvents.taskId, id)).run();
+		tx.delete(tasks).where(eq(tasks.id, id)).run();
+	});
+	return existing;
 }

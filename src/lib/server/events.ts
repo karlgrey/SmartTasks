@@ -1,7 +1,7 @@
 import type { TaskDTO, CommentDTO } from '$lib/types';
 
 export type TaskEvent = {
-	type: 'task.created' | 'task.updated' | 'comment.created';
+	type: 'task.created' | 'task.updated' | 'comment.created' | 'task.deleted';
 	task: TaskDTO;
 	comment?: CommentDTO;
 };

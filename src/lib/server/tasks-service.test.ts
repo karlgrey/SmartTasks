@@ -1,10 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import { eq } from 'drizzle-orm';
-import { listTasks, createTask, parseTaskFilters, getTask, updateTask } from './tasks-service';
+import { listTasks, createTask, parseTaskFilters, getTask, updateTask, deleteTask } from './tasks-service';
 import { testDb, seedUsers } from './test-utils';
 import { tasks } from './db/schema';
 import { createLocation } from './locations-service';
 import { createProject } from './projects-service';
+import { addComment } from './comments-service';
 
 describe('createTask', () => {
 	it('creates with defaults and rejects empty titles and bad enums', () => {
@@ -121,11 +122,18 @@ describe('parseTaskFilters', () => {
 });
 
 describe('getTask', () => {
-	it('returns task with comments, 404 otherwise', () => {
+	it('returns task with comments and statusEvents, 404 otherwise', () => {
 		const db = testDb();
 		const { micha } = seedUsers(db);
 		const t = createTask(db, micha, { title: 'With comments' });
-		expect(getTask(db, t.id)).toEqual({ ...t, comments: [] });
+		const detail = getTask(db, t.id);
+		expect(detail.comments).toEqual([]);
+		expect(detail.statusEvents).toHaveLength(1);
+		expect(detail.statusEvents[0]).toMatchObject({
+			fromStatus: null,
+			toStatus: 'Inbox',
+			userId: micha.id
+		});
 		expect(() => getTask(db, 999)).toThrowError('task not found');
 	});
 });
@@ -184,5 +192,55 @@ describe('updateTask', () => {
 			// @ts-expect-error invalid type on purpose
 			updateTask(db, micha, t.id, { hours: 'abc' })
 		).toThrowError('invalid hours: must be a number');
+	});
+});
+
+describe('status events', () => {
+	it('records creation and real status changes with actor and timestamps', () => {
+		const db = testDb();
+		const { micha, claude } = seedUsers(db);
+		const t = createTask(db, micha, { title: 'Track me', status: 'To Do' });
+		let detail = getTask(db, t.id);
+		expect(detail.statusEvents).toHaveLength(1);
+		expect(detail.statusEvents[0]).toMatchObject({
+			fromStatus: null,
+			toStatus: 'To Do',
+			userId: micha.id,
+			createdAt: t.createdAt
+		});
+
+		const updated = updateTask(db, claude, t.id, { status: 'In Progress' });
+		detail = getTask(db, t.id);
+		expect(detail.statusEvents).toHaveLength(2);
+		expect(detail.statusEvents[1]).toMatchObject({
+			fromStatus: 'To Do',
+			toStatus: 'In Progress',
+			userId: claude.id,
+			createdAt: updated.updatedAt
+		});
+	});
+
+	it('writes no event for same-status or non-status patches', () => {
+		const db = testDb();
+		const { micha } = seedUsers(db);
+		const t = createTask(db, micha, { title: 'Quiet' });
+		updateTask(db, micha, t.id, { status: 'Inbox' });
+		updateTask(db, micha, t.id, { title: 'Still quiet' });
+		expect(getTask(db, t.id).statusEvents).toHaveLength(1);
+	});
+});
+
+describe('deleteTask', () => {
+	it('cascades comments and events, humans only, 404 on missing', () => {
+		const db = testDb();
+		const { micha, claude } = seedUsers(db);
+		const t = createTask(db, micha, { title: 'Doomed' });
+		addComment(db, micha, t.id, 'bye');
+		updateTask(db, micha, t.id, { status: 'Done' });
+		expect(() => deleteTask(db, claude, t.id)).toThrowError('AI users cannot delete tasks');
+		const deleted = deleteTask(db, micha, t.id);
+		expect(deleted.id).toBe(t.id);
+		expect(() => getTask(db, t.id)).toThrowError('task not found');
+		expect(() => deleteTask(db, micha, t.id)).toThrowError('task not found');
 	});
 });

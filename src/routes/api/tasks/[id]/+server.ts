@@ -2,7 +2,7 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import { db } from '$lib/server/db';
 import { run, requireUser } from '$lib/server/api-utils';
-import { getTask, updateTask } from '$lib/server/tasks-service';
+import { getTask, updateTask, deleteTask } from '$lib/server/tasks-service';
 import { emit } from '$lib/server/events';
 
 export const GET: RequestHandler = ({ locals, params }) =>
@@ -17,4 +17,12 @@ export const PATCH: RequestHandler = ({ locals, params, request }) =>
 		const task = updateTask(db, user, Number(params.id), await request.json().catch(() => ({})));
 		emit({ type: 'task.updated', task });
 		return json(task);
+	});
+
+export const DELETE: RequestHandler = ({ locals, params }) =>
+	run(() => {
+		const user = requireUser(locals);
+		const task = deleteTask(db, user, Number(params.id));
+		emit({ type: 'task.deleted', task });
+		return json({ ok: true });
 	});
