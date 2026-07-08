@@ -79,3 +79,14 @@ describe('location filter', () => {
 		expect(board.filtered(new URLSearchParams('location=5')).map((t) => t.id)).toEqual([1]);
 	});
 });
+
+describe('filterDefaults', () => {
+	it('maps active assignee/project filters to new-task fields', () => {
+		expect(board.filterDefaults(new URLSearchParams('assignee=2&project=7&q=x&location=5'))).toEqual({
+			assigneeId: 2,
+			projectId: 7
+		});
+		expect(board.filterDefaults(new URLSearchParams('q=wood'))).toEqual({});
+		expect(board.filterDefaults(new URLSearchParams(''))).toEqual({});
+	});
+});

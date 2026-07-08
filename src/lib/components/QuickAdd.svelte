@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { page } from '$app/state';
 	import { board } from '$lib/client/board.svelte';
 	import type { Status } from '$lib/types';
 
@@ -8,7 +9,11 @@
 	async function submit(e: SubmitEvent) {
 		e.preventDefault();
 		if (!title.trim()) return;
-		await board.createTask({ title: title.trim(), status });
+		await board.createTask({
+			title: title.trim(),
+			status,
+			...board.filterDefaults(page.url.searchParams)
+		});
 		title = '';
 	}
 </script>

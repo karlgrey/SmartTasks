@@ -68,6 +68,17 @@ class BoardState {
 			.sort(compareTasks);
 	}
 
+	// Active board filters, mapped to field values for a new task — quick-add uses
+	// this so a freshly created task doesn't vanish behind the very filter that's on.
+	filterDefaults(params: URLSearchParams): { assigneeId?: number; projectId?: number } {
+		const defaults: { assigneeId?: number; projectId?: number } = {};
+		const assignee = params.get('assignee');
+		if (assignee) defaults.assigneeId = Number(assignee);
+		const project = params.get('project');
+		if (project) defaults.projectId = Number(project);
+		return defaults;
+	}
+
 	upsert(task: TaskDTO, opts: { flash?: boolean } = {}) {
 		const i = this.tasks.findIndex((t) => t.id === task.id);
 		if (i === -1) this.tasks.push(task);
