@@ -8,6 +8,9 @@
 
 	const assignee = $derived(board.users.find((u) => u.id === task.assigneeId));
 	const project = $derived(board.projects.find((p) => p.id === task.projectId));
+	const location = $derived(
+		project ? board.locations.find((l) => l.id === project.locationId) : undefined
+	);
 	const overdue = $derived(
 		!!task.dueDate && task.status !== 'Done' && task.dueDate < new Date().toISOString().slice(0, 10)
 	);
@@ -25,6 +28,7 @@
 		{#if task.priority}<span class="badge prio-{task.priority.toLowerCase()}">{task.priority}</span>{/if}
 		{#if task.size}<span class="badge">{task.size}</span>{/if}
 		{#if project}<span class="badge" style="background:{project.color}22;color:{project.color}">{project.name}</span>{/if}
+		{#if location}<span class="badge">{location.name}</span>{/if}
 		{#if task.dueDate}<span class="badge" class:overdue>{task.dueDate}</span>{/if}
 		{#if assignee}<span class="avatar" style="background:{assignee.color}" title={assignee.name}>{assignee.name[0]}</span>{/if}
 	</span>

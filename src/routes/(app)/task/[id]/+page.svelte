@@ -5,19 +5,27 @@
 	import { board } from '$lib/client/board.svelte';
 	import { renderMarkdown } from '$lib/client/markdown';
 	import { STATUSES, PRIORITIES, SIZES } from '$lib/types';
-	import type { TaskDTO, CommentDTO, Status, Priority, Size } from '$lib/types';
+	import type { TaskDTO, CommentDTO, Status, Priority, Size, StatusEventDTO } from '$lib/types';
 
-	type Detail = TaskDTO & { comments: CommentDTO[] };
+	type Detail = TaskDTO & { comments: CommentDTO[]; statusEvents: StatusEventDTO[] };
 
 	let detail = $state<Detail | null>(null);
 	let commentBody = $state('');
 	let editingDescription = $state(false);
+	let confirmDelete = $state(false);
 
 	const id = $derived(Number(page.params.id));
+
+	const locationName = $derived.by(() => {
+		const project = board.projects.find((p) => p.id === detail?.projectId);
+		const loc = project ? board.locations.find((l) => l.id === project.locationId) : undefined;
+		return loc?.name ?? '—';
+	});
 
 	$effect(() => {
 		const current = id;
 		detail = null;
+		confirmDelete = false;
 		api<Detail>(`/api/tasks/${current}`)
 			.then((d) => {
 				if (current === id) detail = d;
@@ -72,6 +80,7 @@
 <aside class="panel">
 	{#if detail}
 		<header>
+			<span class="task-id">#{detail.id}</span>
 			<input
 				class="title"
 				value={detail.title}
@@ -124,6 +133,9 @@
 					<option value="">—</option>
 					{#each board.projects.filter((p) => !p.archived) as p (p.id)}<option value={p.id}>{board.projectLabel(p)}</option>{/each}
 				</select>
+			</label>
+			<label>Location
+				<input type="text" value={locationName} readonly tabindex="-1" />
 			</label>
 			<label>Due date
 				<input
@@ -184,8 +196,26 @@
 		</section>
 
 		<footer class="meta">
-			Created by {userName(detail.createdBy)} · {fmt(detail.createdAt)}
-			{#if detail.completedAt} · Completed {fmt(detail.completedAt)}{/if}
+			<div>Created by {userName(detail.createdBy)} · {fmt(detail.createdAt)}</div>
+			<div class="history">
+				{#each detail.statusEvents as ev (ev.id)}
+					<div>
+						{ev.fromStatus ? `${ev.fromStatus} → ` : '→ '}{ev.toStatus} · {userName(ev.userId)} · {fmt(ev.createdAt)}
+					</div>
+				{/each}
+			</div>
+			<button
+				class="delete"
+				onclick={async () => {
+					if (!confirmDelete) {
+						confirmDelete = true;
+						return;
+					}
+					if (await board.deleteTask(id)) close();
+				}}
+			>
+				{confirmDelete ? 'Really delete?' : 'Delete task'}
+			</button>
 		</footer>
 	{/if}
 </aside>
@@ -225,6 +255,7 @@
 		font-weight: 600;
 		border: 0;
 		padding: 4px;
+		min-width: 0;
 	}
 	.title:focus {
 		outline: 1px solid var(--accent);
@@ -239,7 +270,7 @@
 	}
 	.fields {
 		display: grid;
-		grid-template-columns: 1fr 1fr;
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 		gap: 10px;
 	}
 	label {
@@ -254,6 +285,8 @@
 		padding: 6px 8px;
 		border: 1px solid var(--border);
 		border-radius: 6px;
+		max-width: 100%;
+		width: 100%;
 	}
 	textarea {
 		width: 100%;
@@ -267,6 +300,7 @@
 		padding: 8px;
 		border-radius: 6px;
 		cursor: text;
+		overflow-wrap: anywhere;
 	}
 	.rendered:hover {
 		background: var(--bg);
@@ -286,6 +320,7 @@
 		border: 1px solid var(--border);
 		border-radius: var(--radius);
 		padding: 8px 10px;
+		overflow-wrap: anywhere;
 	}
 	.comments article header {
 		font-size: 12px;
@@ -307,6 +342,35 @@
 	.meta {
 		font-size: 12px;
 		color: var(--muted);
+	}
+	.task-id {
+		color: var(--muted);
+		font-size: 13px;
+		white-space: nowrap;
+	}
+	input[readonly] {
+		padding: 6px 8px;
+		border: 1px solid var(--border);
+		border-radius: 6px;
+		background: var(--bg);
+		color: var(--muted);
+	}
+	.meta {
+		display: grid;
+		gap: 6px;
+		justify-items: start;
+	}
+	.history {
+		display: grid;
+		gap: 2px;
+	}
+	.delete {
+		border: 0;
+		background: none;
+		color: var(--danger);
+		cursor: pointer;
+		padding: 0;
+		font-size: 12px;
 	}
 	@media (max-width: 767px) {
 		.panel {

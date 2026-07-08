@@ -106,6 +106,21 @@ class BoardState {
 		}
 	}
 
+	remove(id: number) {
+		this.tasks = this.tasks.filter((t) => t.id !== id);
+	}
+
+	async deleteTask(id: number): Promise<boolean> {
+		try {
+			await api<{ ok: boolean }>(`/api/tasks/${id}`, { method: 'DELETE' });
+			this.remove(id);
+			return true;
+		} catch (e) {
+			this.toast((e as Error).message);
+			return false;
+		}
+	}
+
 	async loadMoreDone() {
 		const offset = this.tasks.filter((t) => t.status === 'Done').length;
 		const more = await api<TaskDTO[]>(`/api/tasks?status=Done&limit=50&offset=${offset}`);
@@ -126,7 +141,8 @@ class BoardState {
 		es.onmessage = (m) => {
 			try {
 				const e = JSON.parse(m.data);
-				if (e.task) this.upsert(e.task, { flash: true });
+				if (e.type === 'task.deleted' && e.task) this.remove(e.task.id);
+				else if (e.task) this.upsert(e.task, { flash: true });
 			} catch {
 				// ignore malformed events
 			}
