@@ -15,6 +15,13 @@
       "when": 1783421111620,
       "tag": "0001_cold_colossus",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1783510234801,
+      "tag": "0002_naive_dragon_lord",
+      "breakpoints": true
     }
   ]
 }

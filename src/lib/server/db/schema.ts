@@ -66,3 +66,16 @@ export const comments = sqliteTable('comments', {
 	body: text('body').notNull(),
 	createdAt: text('created_at').notNull()
 });
+
+export const statusEvents = sqliteTable('status_events', {
+	id: integer('id').primaryKey({ autoIncrement: true }),
+	taskId: integer('task_id')
+		.notNull()
+		.references(() => tasks.id),
+	userId: integer('user_id')
+		.notNull()
+		.references(() => users.id),
+	fromStatus: text('from_status', { enum: STATUSES }),
+	toStatus: text('to_status', { enum: STATUSES }).notNull(),
+	createdAt: text('created_at').notNull()
+});

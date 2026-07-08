@@ -55,3 +55,12 @@ export type CommentDTO = {
 	body: string;
 	createdAt: string;
 };
+
+export type StatusEventDTO = {
+	id: number;
+	taskId: number;
+	userId: number;
+	fromStatus: Status | null;
+	toStatus: Status;
+	createdAt: string;
+};

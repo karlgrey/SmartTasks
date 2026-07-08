@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createDb } from './index';
-import { tasks, users, locations, projects } from './schema';
+import { tasks, users, locations, projects, statusEvents } from './schema';
 
 describe('db', () => {
 	it('creates schema and round-trips a task', () => {
@@ -33,5 +33,27 @@ describe('db', () => {
 			.get();
 		expect(project.locationId).toBe(loc.id);
 		expect(project.wikiRef).toBe('Teichbau Schiffmühle');
+	});
+
+	it('stores status events', () => {
+		const db = createDb(':memory:');
+		const user = db
+			.insert(users)
+			.values({ name: 'M', email: 'm@t.dev', type: 'human' })
+			.returning()
+			.get();
+		const now = new Date().toISOString();
+		const task = db
+			.insert(tasks)
+			.values({ title: 't', createdBy: user.id, createdAt: now, updatedAt: now })
+			.returning()
+			.get();
+		const ev = db
+			.insert(statusEvents)
+			.values({ taskId: task.id, userId: user.id, fromStatus: null, toStatus: 'Inbox', createdAt: now })
+			.returning()
+			.get();
+		expect(ev.fromStatus).toBeNull();
+		expect(ev.toStatus).toBe('Inbox');
 	});
 });
