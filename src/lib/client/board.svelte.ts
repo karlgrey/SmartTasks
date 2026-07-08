@@ -115,7 +115,6 @@ class BoardState {
 		try {
 			await api<{ ok: boolean }>(`/api/tasks/${id}`, { method: 'DELETE' });
 			this.remove(id);
-			this.lastDeletedId = id;
 			return true;
 		} catch (e) {
 			this.toast((e as Error).message);
