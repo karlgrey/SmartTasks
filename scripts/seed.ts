@@ -4,11 +4,9 @@ import { createUser, setApiKey } from '../src/lib/server/auth';
 
 const db = createDb(process.env.DATABASE_PATH ?? 'data/smarttasks.db');
 
-const HUMANS = [
-	{ name: 'Micha', email: 'mic@dynamicdudes.com', color: '#ef4444' },
-	{ name: 'Ulf', email: 'ulf@example.com', color: '#3b82f6' },
-	{ name: 'Holger', email: 'holger@example.com', color: '#f59e0b' }
-];
+// Further users (Ulf, Holger, …) are added later via scripts/create-user.ts —
+// never seed placeholder email addresses into production.
+const HUMANS = [{ name: 'Micha', email: 'mic@dynamicdudes.com', color: '#ef4444' }];
 
 for (const human of HUMANS) {
 	const password = randomBytes(9).toString('base64url');
