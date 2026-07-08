@@ -15,11 +15,24 @@ Lean kanban task manager for humans and AI agents. SvelteKit + SQLite, one proce
 Agents authenticate with `Authorization: Bearer <api-key>` — full guide at `/api/docs`.
 Issue/rotate a key: `npx tsx scripts/create-api-key.ts <user-name>`.
 
-## Deploy (Fly.io)
-	fly launch --no-deploy          # once; creates the app, keep the generated name in fly.toml and update ORIGIN to match
-	fly volumes create smarttasks_data --size 1
-	fly secrets set LITESTREAM_REPLICA_URL=s3://<bucket>/smarttasks AWS_ACCESS_KEY_ID=… AWS_SECRET_ACCESS_KEY=…
-	fly deploy
-	fly ssh console -C "npm run seed"   # once, on the first deploy
+## Deploy (Strato VPS)
 
-Without `LITESTREAM_REPLICA_URL` the app runs fine but unreplicated (volume snapshots only).
+Production runs at https://tasks.remoterepublic.com on the labs VPS:
+`/opt/smarttasks`, systemd unit `smarttasks.service` (nvm Node 22, port 3020,
+`DATABASE_PATH=/opt/smarttasks/data/smarttasks.db`), Caddy vhost in
+`/etc/caddy/Caddyfile`, nightly SQLite backup via cron to `/opt/backups/smarttasks/`
+(14-day rotation). The server pulls via the `github-smarttasks` SSH alias
+(deploy key `~/.ssh/smarttasks_deploy`).
+
+Ship an update:
+
+	ssh deploy@labs.remoterepublic.com '/opt/smarttasks/scripts/deploy-vps.sh'
+
+Add a user / rotate an agent key (on the server, with the production DATABASE_PATH):
+
+	npx tsx scripts/create-user.ts <name> <email> [color]
+	npx tsx scripts/create-api-key.ts <user-name>
+
+The repo also ships Docker/Fly.io/Litestream files (`Dockerfile`, `fly.toml`,
+`litestream.yml`) as an alternative container path; they are not used by the
+VPS setup.
