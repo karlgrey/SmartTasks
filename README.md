@@ -21,8 +21,8 @@ Production runs at https://tasks.remoterepublic.com on the labs VPS:
 `/opt/smarttasks`, systemd unit `smarttasks.service` (nvm Node 22, port 3020,
 `DATABASE_PATH=/opt/smarttasks/data/smarttasks.db`), Caddy vhost in
 `/etc/caddy/Caddyfile`, nightly SQLite backup via cron to `/opt/backups/smarttasks/`
-(14-day rotation). The server pulls via the `github-smarttasks` SSH alias
-(deploy key `~/.ssh/smarttasks_deploy`).
+(14-day rotation). The server pulls from the public GitHub repo via https —
+no deploy key.
 
 Ship an update:
 
