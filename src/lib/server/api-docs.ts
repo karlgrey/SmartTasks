@@ -38,4 +38,6 @@ Projects and locations are maintained via this API only — there is no manageme
 A project may carry a \`wikiRef\`: the page name of its knowledge page in the TheBrain2
 vault (\`wiki/projekte/<wikiRef>.md\`). When you work a task, read that page for project
 context if a wikiRef is set. Locations are physical places; each project has at most one.
+Convention: every project gets a location — projects without a physical place (digital,
+overhead, cross-location work) use the location named \`None\`.
 `;
