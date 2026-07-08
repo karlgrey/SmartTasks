@@ -6,7 +6,7 @@ const db = createDb(process.env.DATABASE_PATH ?? 'data/smarttasks.db');
 
 // Further users (Ulf, Holger, …) are added later via scripts/create-user.ts —
 // never seed placeholder email addresses into production.
-const HUMANS = [{ name: 'Micha', email: 'mic@dynamicdudes.com', color: '#ef4444' }];
+const HUMANS = [{ name: 'Micha', email: 'micha@remoterepublic.com', color: '#ef4444' }];
 
 for (const human of HUMANS) {
 	const password = randomBytes(9).toString('base64url');
