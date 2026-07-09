@@ -470,12 +470,13 @@
 		padding: 0 4px;
 	}
 	.add {
-		aspect-ratio: 4 / 3;
+		width: 72px;
+		height: 72px;
 		display: grid;
 		place-items: center;
 		border: 1px dashed var(--border);
 		border-radius: 6px;
-		font-size: 28px;
+		font-size: 22px;
 		color: var(--muted);
 		cursor: pointer;
 	}
