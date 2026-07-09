@@ -6,6 +6,10 @@ import { tasks } from './db/schema';
 import { createLocation } from './locations-service';
 import { createProject } from './projects-service';
 import { addComment } from './comments-service';
+import { mkdtempSync, rmSync, existsSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { addAttachment, attachmentPath } from './attachments-service';
 
 describe('createTask', () => {
 	it('creates with defaults and rejects empty titles and bad enums', () => {
@@ -261,5 +265,22 @@ describe('deleteTask', () => {
 		expect(deleted.id).toBe(t.id);
 		expect(() => getTask(db, t.id)).toThrowError('task not found');
 		expect(() => deleteTask(db, micha, t.id)).toThrowError('task not found');
+	});
+
+	it('getTask includes attachments; deleteTask removes their files', () => {
+		const db = testDb();
+		const { micha } = seedUsers(db);
+		const dir = mkdtempSync(join(tmpdir(), 'st-uploads-'));
+		const task = createTask(db, micha, { title: 'with photo' });
+		const a = addAttachment(
+			db, micha, task.id,
+			{ filename: 'p.png', mime: 'image/png', data: Buffer.from([1, 2, 3]) },
+			dir
+		);
+		expect(getTask(db, task.id).attachments).toEqual([a]);
+		deleteTask(db, micha, task.id, dir);
+		expect(existsSync(attachmentPath(a, dir))).toBe(false);
+		expect(() => getTask(db, task.id)).toThrowError(/not found/);
+		rmSync(dir, { recursive: true, force: true });
 	});
 });

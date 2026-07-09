@@ -1,9 +1,10 @@
 import { and, eq, ne, or, like, sql, asc, desc, type SQL } from 'drizzle-orm';
 import type { Db } from './db';
-import { tasks, users, comments, projects, statusEvents } from './db/schema';
+import { tasks, users, comments, projects, statusEvents, attachments } from './db/schema';
 import { ServiceError } from './errors';
 import type { SafeUser } from './auth';
-import { STATUSES, PRIORITIES, SIZES, type Status, type Priority, type Size, type TaskDTO, type CommentDTO, type StatusEventDTO } from '$lib/types';
+import { deleteTaskAttachments, uploadsDir } from './attachments-service';
+import { STATUSES, PRIORITIES, SIZES, type Status, type Priority, type Size, type TaskDTO, type CommentDTO, type StatusEventDTO, type AttachmentDTO } from '$lib/types';
 
 export type TaskFilters = {
 	assignee?: string;
@@ -157,7 +158,10 @@ export function parseTaskFilters(params: URLSearchParams): TaskFilters {
 	return f;
 }
 
-export function getTask(db: Db, id: number): TaskDTO & { comments: CommentDTO[]; statusEvents: StatusEventDTO[] } {
+export function getTask(
+	db: Db,
+	id: number
+): TaskDTO & { comments: CommentDTO[]; statusEvents: StatusEventDTO[]; attachments: AttachmentDTO[] } {
 	const task = db.select().from(tasks).where(eq(tasks.id, id)).get();
 	if (!task) throw new ServiceError(404, 'task not found');
 	const taskComments = db
@@ -172,7 +176,13 @@ export function getTask(db: Db, id: number): TaskDTO & { comments: CommentDTO[];
 		.where(eq(statusEvents.taskId, id))
 		.orderBy(asc(statusEvents.createdAt), asc(statusEvents.id))
 		.all();
-	return { ...task, comments: taskComments, statusEvents: events };
+	const taskAttachments = db
+		.select()
+		.from(attachments)
+		.where(eq(attachments.taskId, id))
+		.orderBy(asc(attachments.id))
+		.all();
+	return { ...task, comments: taskComments, statusEvents: events, attachments: taskAttachments };
 }
 
 const UPDATABLE = [
@@ -214,10 +224,12 @@ export function updateTask(
 	});
 }
 
-export function deleteTask(db: Db, user: SafeUser, id: number): TaskDTO {
+export function deleteTask(db: Db, user: SafeUser, id: number, uploadsPath = uploadsDir()): TaskDTO {
 	const existing = db.select().from(tasks).where(eq(tasks.id, id)).get();
 	if (!existing) throw new ServiceError(404, 'task not found');
 	if (user.type === 'ai') throw new ServiceError(403, 'AI users cannot delete tasks');
+	// attachment rows must go before the task row (FK); file unlink is best-effort
+	deleteTaskAttachments(db, id, uploadsPath);
 	db.transaction((tx) => {
 		tx.delete(comments).where(eq(comments.taskId, id)).run();
 		tx.delete(statusEvents).where(eq(statusEvents.taskId, id)).run();
