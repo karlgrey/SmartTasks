@@ -89,6 +89,16 @@
 	const userName = (uid: number | null) =>
 		board.users.find((u) => u.id === uid)?.name ?? '—';
 	const fmt = (iso: string) => iso.slice(0, 16).replace('T', ' ');
+
+	function autosize(el: HTMLTextAreaElement) {
+		const resize = () => {
+			el.style.height = 'auto';
+			el.style.height = `${el.scrollHeight}px`;
+		};
+		resize();
+		el.addEventListener('input', resize);
+		return { destroy: () => el.removeEventListener('input', resize) };
+	}
 </script>
 
 <svelte:window onkeydown={(e) => e.key === 'Escape' && close()} />
@@ -104,11 +114,19 @@
 	{#if detail}
 		<header>
 			<span class="task-id">#{detail.id}</span>
-			<input
+			<textarea
 				class="title"
+				rows="1"
+				use:autosize
 				value={detail.title}
 				onchange={(e) => save({ title: e.currentTarget.value })}
-			/>
+				onkeydown={(e) => {
+					if (e.key === 'Enter') {
+						e.preventDefault();
+						e.currentTarget.blur();
+					}
+				}}
+			></textarea>
 			<button class="close" onclick={close} aria-label="Close">×</button>
 		</header>
 
@@ -276,15 +294,23 @@
 	header {
 		display: flex;
 		gap: 8px;
-		align-items: center;
+		align-items: flex-start;
 	}
 	.title {
 		flex: 1;
+		font-family: inherit;
 		font-size: 17px;
 		font-weight: 600;
+		line-height: 1.35;
 		border: 0;
+		border-radius: 0;
 		padding: 4px;
 		min-width: 0;
+		min-height: 0;
+		resize: none;
+		overflow: hidden;
+		background: none;
+		color: inherit;
 	}
 	.title:focus {
 		outline: 1px solid var(--accent);
@@ -294,6 +320,8 @@
 		border: 0;
 		background: none;
 		font-size: 22px;
+		line-height: 1;
+		padding: 4px 2px;
 		cursor: pointer;
 		color: var(--muted);
 	}
@@ -372,6 +400,7 @@
 		color: var(--muted);
 		font-size: 13px;
 		white-space: nowrap;
+		padding-top: 8px;
 	}
 	input[readonly] {
 		padding: 6px 8px;
