@@ -57,6 +57,16 @@ export type CommentDTO = {
 	createdAt: string;
 };
 
+export type AttachmentDTO = {
+	id: number;
+	taskId: number;
+	filename: string;
+	mime: string;
+	size: number; // bytes as stored
+	createdBy: number;
+	createdAt: string;
+};
+
 export type StatusEventDTO = {
 	id: number;
 	taskId: number;

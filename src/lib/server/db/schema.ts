@@ -67,6 +67,20 @@ export const comments = sqliteTable('comments', {
 	createdAt: text('created_at').notNull()
 });
 
+export const attachments = sqliteTable('attachments', {
+	id: integer('id').primaryKey({ autoIncrement: true }),
+	taskId: integer('task_id')
+		.notNull()
+		.references(() => tasks.id),
+	filename: text('filename').notNull(),
+	mime: text('mime').notNull(),
+	size: integer('size').notNull(),
+	createdBy: integer('created_by')
+		.notNull()
+		.references(() => users.id),
+	createdAt: text('created_at').notNull()
+});
+
 export const statusEvents = sqliteTable('status_events', {
 	id: integer('id').primaryKey({ autoIncrement: true }),
 	taskId: integer('task_id')
