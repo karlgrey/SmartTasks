@@ -1,5 +1,12 @@
 # Photo Attachments (v1.3) Implementation Plan
 
+> **Status: EXECUTED & DEPLOYED 2026-07-09** — all six tasks done (commits
+> `d4a1b02..b67dc32`), live on tasks.remoterepublic.com. Deploy checklist
+> completed: systemd drop-in `uploads.conf` (BODY_SIZE_LIMIT=6M; ORIGIN was
+> already set), backup script extended for the uploads dir. Notable deviation:
+> e2e initially failed because SvelteKit's CSRF check rejects multipart POSTs
+> without ORIGIN — playwright.config.ts now sets it for the webServer.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Photos attach to tasks; gallery in the detail panel; the board loads zero image bytes.

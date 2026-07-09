@@ -1,7 +1,8 @@
 # SmartTasks v1.3 — Photo Attachments
 
 **Date:** 2026-07-09
-**Status:** Approved design
+**Status:** Shipped 2026-07-09 (deployed to tasks.remoterepublic.com; feature commits
+`d4a1b02..b67dc32`, UI polish `8022e44` + `3435a89`)
 **Builds on:** v1.2 (shipped, live at tasks.remoterepublic.com)
 
 ## Purpose
@@ -65,8 +66,11 @@ Deleting a task deletes its attachment rows (FK cascade) and unlinks the files
 
 ## Client (detail panel)
 
-- New "Photos" row between description and comments: horizontal strip of
-  thumbnails (~72px, CSS-sized, `loading="lazy"`), plus an add button.
+- New "Photos" row between description and comments: previews as a
+  **two-column 4:3 grid** (half panel width each, `object-fit: cover`,
+  `loading="lazy"`), plus a compact 72px add tile — so an empty section stays
+  small (the common case). *(Post-ship revision by Micha; originally shipped as
+  a 72px strip.)*
 - `<input type="file" accept="image/*" multiple>` — on mobile this offers the
   camera directly.
 - Before upload the client downscales via canvas: longest edge ≤1600px,
