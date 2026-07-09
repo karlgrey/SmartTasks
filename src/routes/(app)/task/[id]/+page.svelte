@@ -438,14 +438,13 @@
 		gap: 8px;
 	}
 	.photos .strip {
-		display: flex;
-		flex-wrap: wrap;
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
 		gap: 8px;
 	}
 	.thumb {
 		position: relative;
-		width: 72px;
-		height: 72px;
+		aspect-ratio: 4 / 3;
 	}
 	.thumb img {
 		width: 100%;
@@ -471,13 +470,12 @@
 		padding: 0 4px;
 	}
 	.add {
-		width: 72px;
-		height: 72px;
+		aspect-ratio: 4 / 3;
 		display: grid;
 		place-items: center;
 		border: 1px dashed var(--border);
 		border-radius: 6px;
-		font-size: 22px;
+		font-size: 28px;
 		color: var(--muted);
 		cursor: pointer;
 	}
