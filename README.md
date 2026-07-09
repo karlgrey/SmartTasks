@@ -28,6 +28,16 @@ Ship an update:
 
 	ssh deploy@labs.remoterepublic.com '/opt/smarttasks/scripts/deploy-vps.sh'
 
+### Photo attachments (v1.3)
+
+- Files live in `<dirname(DATABASE_PATH)>/uploads/` (prod: `/opt/smarttasks/data/uploads/`).
+- adapter-node caps request bodies at 512K by default — production needs
+  `BODY_SIZE_LIMIT=6M` in the systemd unit (matches the server-side 5 MB limit).
+- `ORIGIN=https://tasks.remoterepublic.com` must be set in the systemd unit:
+  SvelteKit's CSRF check rejects the multipart upload POST without it
+  (JSON endpoints are exempt, which is why everything else works regardless).
+- The nightly backup must include the uploads dir alongside the sqlite file.
+
 Add a user / rotate an agent key (on the server, with the production DATABASE_PATH):
 
 	npx tsx scripts/create-user.ts <name> <email> [color]
