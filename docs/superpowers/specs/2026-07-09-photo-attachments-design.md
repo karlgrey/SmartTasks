@@ -40,6 +40,7 @@ storage, which is overkill for a 3-person tool).
 | id | integer PK | |
 | task_id | FK tasks NOT NULL | |
 | filename | text NOT NULL | original name, display only |
+| mime | text NOT NULL | image/jpeg·png·webp; drives Content-Type when serving |
 | size | integer NOT NULL | bytes as stored |
 | created_by | FK users NOT NULL | |
 | created_at | datetime NOT NULL | ISO string |
