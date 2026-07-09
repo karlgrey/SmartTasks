@@ -4,15 +4,21 @@
 	import { api } from '$lib/client/api';
 	import { board } from '$lib/client/board.svelte';
 	import { renderMarkdown } from '$lib/client/markdown';
+	import { downscaleImage } from '$lib/client/image';
 	import { STATUSES, PRIORITIES, SIZES } from '$lib/types';
-	import type { TaskDTO, CommentDTO, Status, Priority, Size, StatusEventDTO } from '$lib/types';
+	import type { TaskDTO, CommentDTO, Status, Priority, Size, StatusEventDTO, AttachmentDTO } from '$lib/types';
 
-	type Detail = TaskDTO & { comments: CommentDTO[]; statusEvents: StatusEventDTO[] };
+	type Detail = TaskDTO & {
+		comments: CommentDTO[];
+		statusEvents: StatusEventDTO[];
+		attachments: AttachmentDTO[];
+	};
 
 	let detail = $state<Detail | null>(null);
 	let commentBody = $state('');
 	let editingDescription = $state(false);
 	let confirmDelete = $state(false);
+	let confirmPhotoDelete = $state<number | null>(null);
 	let closing = $state(false);
 
 	const id = $derived(Number(page.params.id));
@@ -81,6 +87,39 @@
 			});
 			detail?.comments.push(comment);
 			commentBody = '';
+		} catch (err) {
+			board.toast((err as Error).message);
+		}
+	}
+
+	async function uploadPhotos(e: Event) {
+		const input = e.currentTarget as HTMLInputElement;
+		const files = [...(input.files ?? [])];
+		input.value = '';
+		for (const f of files) {
+			try {
+				const blob = await downscaleImage(f);
+				const form = new FormData();
+				form.append('file', blob, f.name.replace(/\.[^.]*$/, '') + '.jpg');
+				const res = await fetch(`/api/tasks/${id}/attachments`, { method: 'POST', body: form });
+				if (!res.ok)
+					throw new Error((await res.json().catch(() => ({}))).error ?? `HTTP ${res.status}`);
+				detail?.attachments.push(await res.json());
+			} catch (err) {
+				board.toast((err as Error).message);
+			}
+		}
+	}
+
+	async function removePhoto(attId: number) {
+		if (confirmPhotoDelete !== attId) {
+			confirmPhotoDelete = attId;
+			return;
+		}
+		confirmPhotoDelete = null;
+		try {
+			await api(`/api/attachments/${attId}`, { method: 'DELETE' });
+			if (detail) detail.attachments = detail.attachments.filter((a) => a.id !== attId);
 		} catch (err) {
 			board.toast((err as Error).message);
 		}
@@ -220,6 +259,26 @@
 					{/if}
 				</div>
 			{/if}
+		</section>
+
+		<section class="photos">
+			<h3>Photos</h3>
+			<div class="strip">
+				{#each detail.attachments as a (a.id)}
+					<div class="thumb">
+						<a href={`/api/attachments/${a.id}`} target="_blank" rel="noopener">
+							<img src={`/api/attachments/${a.id}`} alt={a.filename} loading="lazy" />
+						</a>
+						<button class="remove" aria-label="Delete photo" onclick={() => removePhoto(a.id)}>
+							{confirmPhotoDelete === a.id ? 'Del?' : '×'}
+						</button>
+					</div>
+				{/each}
+				<label class="add" aria-label="Add photos">
+					+
+					<input type="file" accept="image/*" multiple hidden onchange={uploadPhotos} />
+				</label>
+			</div>
 		</section>
 
 		<section class="comments">
@@ -369,9 +428,58 @@
 		display: grid;
 		gap: 10px;
 	}
-	.comments h3 {
+	.comments h3,
+	.photos h3 {
 		margin: 0;
 		font-size: 13px;
+	}
+	.photos {
+		display: grid;
+		gap: 8px;
+	}
+	.photos .strip {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px;
+	}
+	.thumb {
+		position: relative;
+		width: 72px;
+		height: 72px;
+	}
+	.thumb img {
+		width: 100%;
+		height: 100%;
+		object-fit: cover;
+		border-radius: 6px;
+		border: 1px solid var(--border);
+		display: block;
+	}
+	.thumb .remove {
+		position: absolute;
+		top: -6px;
+		right: -6px;
+		border: 1px solid var(--border);
+		background: var(--surface);
+		border-radius: 10px;
+		min-width: 20px;
+		height: 20px;
+		font-size: 11px;
+		line-height: 1;
+		cursor: pointer;
+		color: var(--muted);
+		padding: 0 4px;
+	}
+	.add {
+		width: 72px;
+		height: 72px;
+		display: grid;
+		place-items: center;
+		border: 1px dashed var(--border);
+		border-radius: 6px;
+		font-size: 22px;
+		color: var(--muted);
+		cursor: pointer;
 	}
 	.comments article {
 		border: 1px solid var(--border);
