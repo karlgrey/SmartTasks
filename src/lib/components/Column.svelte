@@ -13,7 +13,14 @@
 	}
 </script>
 
-<section class="column" data-column={status} role="list" ondragover={(e) => e.preventDefault()} {ondrop}>
+<section
+	class="column"
+	class:in-progress={status === 'In Progress'}
+	data-column={status}
+	role="list"
+	ondragover={(e) => e.preventDefault()}
+	{ondrop}
+>
 	<header>{status} <span class="count">{tasks.length}</span></header>
 	<QuickAdd {status} />
 	<div class="cards">
@@ -34,6 +41,14 @@
 		min-width: 240px;
 		width: 240px;
 		flex-shrink: 0;
+	}
+	.column.in-progress {
+		min-width: 280px;
+		width: 280px;
+		background: #e8f6ed;
+		border: 1px solid #bfe6cc;
+		border-radius: var(--radius);
+		padding: 10px;
 	}
 	header {
 		font-weight: 600;
@@ -59,7 +74,8 @@
 		cursor: pointer;
 	}
 	@media (max-width: 767px) {
-		.column {
+		.column,
+		.column.in-progress {
 			width: 100%;
 			min-width: 0;
 		}
