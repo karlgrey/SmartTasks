@@ -80,6 +80,53 @@ describe('location filter', () => {
 	});
 });
 
+describe('ticket-id search', () => {
+	function initWith(ts: TaskDTO[]) {
+		board.init({
+			user: { id: 1, name: 'M', email: null, type: 'human', color: '#fff' },
+			tasks: ts,
+			done: [],
+			users: [],
+			projects: [],
+			locations: []
+		});
+	}
+
+	it('a plain number matches the task with exactly that id, alongside text matches', () => {
+		initWith([
+			task({ id: 186, title: 'Zaun bauen' }),
+			task({ id: 187, title: 'Rechnung 186 prüfen' }),
+			task({ id: 3, title: 'Anderes' })
+		]);
+		expect(
+			board
+				.filtered(new URLSearchParams('q=186'))
+				.map((t) => t.id)
+				.sort()
+		).toEqual([186, 187]);
+	});
+
+	it('#<zahl> matches ids by prefix (incremental typing)', () => {
+		initWith([
+			task({ id: 18, title: 'A' }),
+			task({ id: 186, title: 'B' }),
+			task({ id: 3, title: 'C' })
+		]);
+		expect(
+			board
+				.filtered(new URLSearchParams('q=#18'))
+				.map((t) => t.id)
+				.sort()
+		).toEqual([18, 186]);
+		expect(board.filtered(new URLSearchParams('q=#186')).map((t) => t.id)).toEqual([186]);
+	});
+
+	it('a plain number does not prefix-match ids', () => {
+		initWith([task({ id: 18, title: 'A' }), task({ id: 186, title: 'B' })]);
+		expect(board.filtered(new URLSearchParams('q=18')).map((t) => t.id)).toEqual([18]);
+	});
+});
+
 describe('filterDefaults', () => {
 	it('maps active assignee/project filters to new-task fields', () => {
 		expect(board.filterDefaults(new URLSearchParams('assignee=2&project=7&q=x&location=5'))).toEqual({

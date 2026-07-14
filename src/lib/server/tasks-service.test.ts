@@ -86,6 +86,25 @@ describe('listTasks', () => {
 		expect(listTasks(db, { limit: 2 })).toHaveLength(2);
 	});
 
+	it('q matches ticket ids: exact for plain numbers, prefix for the #-form', () => {
+		const db = testDb();
+		const { micha } = seedUsers(db);
+		const now = new Date().toISOString();
+		const insert = (id: number, title: string) =>
+			db.insert(tasks).values({ id, title, createdBy: micha.id, createdAt: now, updatedAt: now }).run();
+		insert(18, 'Zaun bauen');
+		insert(186, 'Anderes');
+		insert(200, 'Rechnung 186 prüfen');
+		// plain number: exact id hit PLUS normal text hits
+		expect(listTasks(db, { q: '186' }).map((t) => t.id).sort()).toEqual([186, 200]);
+		// #-form: exact
+		expect(listTasks(db, { q: '#186' }).map((t) => t.id)).toEqual([186]);
+		// #-form: id prefix (incremental typing)
+		expect(listTasks(db, { q: '#18' }).map((t) => t.id).sort()).toEqual([18, 186]);
+		// plain number does not prefix-match ids (200 matches via '18' in its title)
+		expect(listTasks(db, { q: '18' }).map((t) => t.id).sort()).toEqual([18, 200]);
+	});
+
 	it('orders the Done column by most recently completed, not boardOrder', () => {
 		const db = testDb();
 		const { micha } = seedUsers(db);

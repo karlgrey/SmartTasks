@@ -5,6 +5,7 @@ import { ServiceError } from './errors';
 import type { SafeUser } from './auth';
 import { deleteTaskAttachments, uploadsDir } from './attachments-service';
 import { STATUSES, PRIORITIES, SIZES, type Status, type Priority, type Size, type TaskDTO, type CommentDTO, type StatusEventDTO, type AttachmentDTO } from '$lib/types';
+import { parseTicketQuery } from '$lib/ticket-query';
 
 export type TaskFilters = {
 	assignee?: string;
@@ -91,7 +92,18 @@ export function listTasks(db: Db, filters: TaskFilters = {}): TaskDTO[] {
 	if (filters.open) conds.push(ne(tasks.status, 'Done'));
 	if (filters.q) {
 		const pattern = `%${filters.q}%`;
-		conds.push(or(like(tasks.title, pattern), like(tasks.description, pattern))!);
+		const text = or(like(tasks.title, pattern), like(tasks.description, pattern))!;
+		const ticket = parseTicketQuery(filters.q);
+		conds.push(
+			ticket
+				? or(
+						text,
+						ticket.prefix
+							? like(sql`CAST(${tasks.id} AS TEXT)`, `${ticket.digits}%`)
+							: eq(tasks.id, Number(ticket.digits))
+					)!
+				: text
+		);
 	}
 	return db
 		.select()

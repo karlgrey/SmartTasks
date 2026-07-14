@@ -1,4 +1,5 @@
 import type { TaskDTO, UserDTO, ProjectDTO, LocationDTO } from '$lib/types';
+import { parseTicketQuery } from '$lib/ticket-query';
 import { api } from './api';
 
 const PRIORITY_ORDER: Record<string, number> = { 'Super-High': 0, High: 1, Medium: 2, Low: 3 };
@@ -54,6 +55,7 @@ class BoardState {
 		const project = params.get('project');
 		const location = params.get('location');
 		const q = params.get('q')?.toLowerCase();
+		const ticket = q ? parseTicketQuery(q) : null;
 		return this.tasks
 			.filter(
 				(t) =>
@@ -63,7 +65,11 @@ class BoardState {
 						this.projects.find((p) => p.id === t.projectId)?.locationId === Number(location)) &&
 					(!q ||
 						t.title.toLowerCase().includes(q) ||
-						t.description.toLowerCase().includes(q))
+						t.description.toLowerCase().includes(q) ||
+						(ticket !== null &&
+							(ticket.prefix
+								? String(t.id).startsWith(ticket.digits)
+								: String(t.id) === ticket.digits)))
 			)
 			.sort(compareTasks);
 	}
