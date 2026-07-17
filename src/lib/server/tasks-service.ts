@@ -1,11 +1,12 @@
 import { and, eq, ne, or, like, sql, asc, desc, type SQL } from 'drizzle-orm';
 import type { Db } from './db';
-import { tasks, users, comments, projects, statusEvents, attachments } from './db/schema';
+import { tasks, users, comments, projects, statusEvents, attachments, documentTasks } from './db/schema';
 import { ServiceError } from './errors';
 import type { SafeUser } from './auth';
 import { deleteTaskAttachments, uploadsDir } from './attachments-service';
-import { STATUSES, PRIORITIES, SIZES, type Status, type Priority, type Size, type TaskDTO, type CommentDTO, type StatusEventDTO, type AttachmentDTO } from '$lib/types';
+import { STATUSES, PRIORITIES, SIZES, type Status, type Priority, type Size, type TaskDTO, type CommentDTO, type StatusEventDTO, type AttachmentDTO, type DocRefDTO } from '$lib/types';
 import { parseTicketQuery } from '$lib/ticket-query';
+import { listDocRefsForTask } from './documents-service';
 
 export type TaskFilters = {
 	assignee?: string;
@@ -173,7 +174,12 @@ export function parseTaskFilters(params: URLSearchParams): TaskFilters {
 export function getTask(
 	db: Db,
 	id: number
-): TaskDTO & { comments: CommentDTO[]; statusEvents: StatusEventDTO[]; attachments: AttachmentDTO[] } {
+): TaskDTO & {
+	comments: CommentDTO[];
+	statusEvents: StatusEventDTO[];
+	attachments: AttachmentDTO[];
+	documents: DocRefDTO[];
+} {
 	const task = db.select().from(tasks).where(eq(tasks.id, id)).get();
 	if (!task) throw new ServiceError(404, 'task not found');
 	const taskComments = db
@@ -194,7 +200,13 @@ export function getTask(
 		.where(eq(attachments.taskId, id))
 		.orderBy(asc(attachments.id))
 		.all();
-	return { ...task, comments: taskComments, statusEvents: events, attachments: taskAttachments };
+	return {
+		...task,
+		comments: taskComments,
+		statusEvents: events,
+		attachments: taskAttachments,
+		documents: listDocRefsForTask(db, id)
+	};
 }
 
 const UPDATABLE = [
@@ -243,6 +255,7 @@ export function deleteTask(db: Db, user: SafeUser, id: number, uploadsPath = upl
 	// attachment rows must go before the task row (FK); file unlink is best-effort
 	deleteTaskAttachments(db, id, uploadsPath);
 	db.transaction((tx) => {
+		tx.delete(documentTasks).where(eq(documentTasks.taskId, id)).run();
 		tx.delete(comments).where(eq(comments.taskId, id)).run();
 		tx.delete(statusEvents).where(eq(statusEvents.taskId, id)).run();
 		tx.delete(tasks).where(eq(tasks.id, id)).run();

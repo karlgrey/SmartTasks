@@ -19,7 +19,7 @@ Task manager shared by humans and AI agents. Base URL: this host.
 |---|---|
 | GET /api/tasks | List. Query: assignee (user id or name), project (id), location (id, matches the task's project location), status, open=true (status ≠ Done), q (text search; a bare number also matches that task id exactly, \`#18\` matches ids by prefix), limit, offset |
 | POST /api/tasks | Create: {title, description?, status?, priority?, size?, hours?, dueDate?, assigneeId?, projectId?} |
-| GET /api/tasks/:id | Detail incl. comments, statusEvents (status history: who set which status when) and attachments (photos: id, filename, mime, size, createdBy, createdAt) |
+| GET /api/tasks/:id | Detail incl. comments, statusEvents (status history: who set which status when), attachments (photos: id, filename, mime, size, createdBy, createdAt) and documents (linked docs: id, title) |
 | PATCH /api/tasks/:id | Partial update (same fields as create) |
 | DELETE /api/tasks/:id | Delete a task incl. comments and history — human users only (403 for AI); returns \`{"ok": true}\` |
 | POST /api/tasks/:id/comments | Add comment: {body} |
@@ -28,6 +28,15 @@ Task manager shared by humans and AI agents. Base URL: this host.
 | GET /api/locations · POST /api/locations · PATCH /api/locations/:id | Locations: create {name}, update {name?, archived?} |
 | GET /api/users | All users (id, name, type human/ai) |
 | GET /api/events | SSE stream of task changes |
+| GET /api/documents | List docs. Query: project (id), q (LIKE over title+body), limit, offset; newest-updated first |
+| POST /api/documents | Create a doc: {title, body?, projectId?} (Markdown body) |
+| GET /api/documents/:id | Doc detail incl. \`tasks\` (linked tasks: id, title, status) |
+| PATCH /api/documents/:id | Partial update: {title?, body?, projectId?} |
+| DELETE /api/documents/:id | Delete a doc incl. its task links — human users only (403 for AI) |
+| POST /api/documents/:id/tasks | Link a task to the doc: {taskId} (idempotent) |
+| DELETE /api/documents/:id/tasks/:taskId | Unlink a task from the doc |
+| POST /api/tasks/:id/documents | Link a doc to the task: {documentId} (reciprocal, same effect) |
+| DELETE /api/tasks/:id/documents/:documentId | Unlink a doc from the task |
 
 ## Values
 - status: Inbox | To Do | In Progress | Supplier | Review | Done | Icebox
