@@ -1,4 +1,4 @@
-import { sqliteTable, integer, text, real } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, integer, text, real, primaryKey } from 'drizzle-orm/sqlite-core';
 // Relative import (not $lib) on purpose: schema.ts is also loaded by drizzle-kit
 // and the plain-tsx scripts in scripts/, which don't know SvelteKit aliases.
 import { STATUSES, PRIORITIES, SIZES } from '../../types';
@@ -80,6 +80,31 @@ export const attachments = sqliteTable('attachments', {
 		.references(() => users.id),
 	createdAt: text('created_at').notNull()
 });
+
+export const documents = sqliteTable('documents', {
+	id: integer('id').primaryKey({ autoIncrement: true }),
+	title: text('title').notNull(),
+	body: text('body').notNull().default(''),
+	projectId: integer('project_id').references(() => projects.id),
+	createdBy: integer('created_by')
+		.notNull()
+		.references(() => users.id),
+	createdAt: text('created_at').notNull(),
+	updatedAt: text('updated_at').notNull()
+});
+
+export const documentTasks = sqliteTable(
+	'document_tasks',
+	{
+		documentId: integer('document_id')
+			.notNull()
+			.references(() => documents.id),
+		taskId: integer('task_id')
+			.notNull()
+			.references(() => tasks.id)
+	},
+	(t) => [primaryKey({ columns: [t.documentId, t.taskId] })]
+);
 
 export const statusEvents = sqliteTable('status_events', {
 	id: integer('id').primaryKey({ autoIncrement: true }),
