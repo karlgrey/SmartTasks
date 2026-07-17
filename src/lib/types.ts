@@ -67,6 +67,29 @@ export type AttachmentDTO = {
 	createdAt: string;
 };
 
+export type DocumentDTO = {
+	id: number;
+	title: string;
+	body: string; // Markdown source
+	projectId: number | null;
+	createdBy: number;
+	createdAt: string; // ISO datetime
+	updatedAt: string;
+};
+
+// Lightweight reference to a task from a document's detail
+export type TaskRefDTO = {
+	id: number;
+	title: string;
+	status: Status;
+};
+
+// Lightweight reference to a document from a task's detail
+export type DocRefDTO = {
+	id: number;
+	title: string;
+};
+
 export type StatusEventDTO = {
 	id: number;
 	taskId: number;
