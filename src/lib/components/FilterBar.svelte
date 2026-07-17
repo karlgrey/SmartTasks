@@ -25,6 +25,7 @@
 
 <nav>
 	<strong>SmartTasks</strong>
+	<a class="docs-link" href="/docs">Docs</a>
 	{#each board.users as u (u.id)}
 		<button
 			class="chip"
@@ -90,6 +91,11 @@
 		margin-left: 4px;
 		font-size: 10px;
 		color: var(--muted);
+	}
+	.docs-link {
+		color: var(--accent);
+		text-decoration: none;
+		font-weight: 600;
 	}
 	select,
 	input {

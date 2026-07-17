@@ -6,12 +6,13 @@
 	import { renderMarkdown } from '$lib/client/markdown';
 	import { downscaleImage } from '$lib/client/image';
 	import { STATUSES, PRIORITIES, SIZES } from '$lib/types';
-	import type { TaskDTO, CommentDTO, Status, Priority, Size, StatusEventDTO, AttachmentDTO } from '$lib/types';
+	import type { TaskDTO, CommentDTO, Status, Priority, Size, StatusEventDTO, AttachmentDTO, DocRefDTO, DocumentDTO } from '$lib/types';
 
 	type Detail = TaskDTO & {
 		comments: CommentDTO[];
 		statusEvents: StatusEventDTO[];
 		attachments: AttachmentDTO[];
+		documents: DocRefDTO[];
 	};
 
 	let detail = $state<Detail | null>(null);
@@ -120,6 +121,37 @@
 		try {
 			await api(`/api/attachments/${attId}`, { method: 'DELETE' });
 			if (detail) detail.attachments = detail.attachments.filter((a) => a.id !== attId);
+		} catch (err) {
+			board.toast((err as Error).message);
+		}
+	}
+
+	let allDocs = $state<DocumentDTO[]>([]);
+	const linkableDocs = $derived(allDocs.filter((d) => !detail?.documents.some((ld) => ld.id === d.id)));
+
+	async function ensureDocs() {
+		if (allDocs.length === 0) allDocs = await api<DocumentDTO[]>('/api/documents');
+	}
+
+	async function linkDoc(documentId: number) {
+		if (!documentId || !detail) return;
+		try {
+			await api(`/api/tasks/${id}/documents`, {
+				method: 'POST',
+				body: JSON.stringify({ documentId })
+			});
+			const linked = allDocs.find((d) => d.id === documentId);
+			if (linked && detail) detail.documents = [...detail.documents, { id: linked.id, title: linked.title }];
+		} catch (err) {
+			board.toast((err as Error).message);
+		}
+	}
+
+	async function unlinkDoc(documentId: number) {
+		if (!detail) return;
+		try {
+			await api(`/api/tasks/${id}/documents/${documentId}`, { method: 'DELETE' });
+			detail.documents = detail.documents.filter((d) => d.id !== documentId);
 		} catch (err) {
 			board.toast((err as Error).message);
 		}
@@ -281,6 +313,29 @@
 			</div>
 		</section>
 
+		<section class="docs">
+			<h3>Docs</h3>
+			{#each detail.documents as d (d.id)}
+				<div class="doc-row">
+					<a href={`/docs/${d.id}`}>{d.title}</a>
+					<button class="unlink" aria-label="Unlink doc" onclick={() => unlinkDoc(d.id)}>×</button>
+				</div>
+			{/each}
+			<select
+				aria-label="Link a doc"
+				onfocus={ensureDocs}
+				onchange={(e) => {
+					linkDoc(Number(e.currentTarget.value));
+					e.currentTarget.value = '';
+				}}
+			>
+				<option value="">+ Link a doc…</option>
+				{#each linkableDocs as d (d.id)}
+					<option value={d.id}>{d.title}</option>
+				{/each}
+			</select>
+		</section>
+
 		<section class="comments">
 			<h3>Comments</h3>
 			{#each detail.comments as c (c.id)}
@@ -429,9 +484,39 @@
 		gap: 10px;
 	}
 	.comments h3,
-	.photos h3 {
+	.photos h3,
+	.docs h3 {
 		margin: 0;
 		font-size: 13px;
+	}
+	.docs {
+		display: grid;
+		gap: 6px;
+	}
+	.doc-row {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+	}
+	.doc-row a {
+		color: var(--accent);
+		text-decoration: none;
+		overflow-wrap: anywhere;
+	}
+	.docs .unlink {
+		margin-left: auto;
+		background: none;
+		color: var(--muted);
+		border: 1px solid var(--border);
+		border-radius: 6px;
+		padding: 0 8px;
+		cursor: pointer;
+	}
+	.docs select {
+		padding: 6px 8px;
+		border: 1px solid var(--border);
+		border-radius: 6px;
+		justify-self: start;
 	}
 	.photos {
 		display: grid;
