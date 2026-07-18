@@ -234,7 +234,7 @@
 					onchange={(e) => save({ assigneeId: e.currentTarget.value ? Number(e.currentTarget.value) : null })}
 				>
 					<option value="">—</option>
-					{#each board.users as u (u.id)}<option value={u.id}>{u.name}</option>{/each}
+					{#each board.users as u (u.id)}<option value={u.id} data-user-id={u.id}>{u.name}</option>{/each}
 				</select>
 			</label>
 			<label>Project

@@ -31,6 +31,7 @@
 			class="chip"
 			class:active={current.get('assignee') === String(u.id)}
 			style="--c:{u.color}"
+			data-user-id={u.id}
 			onclick={() => toggleAssignee(u.id)}
 		>
 			{u.name}{#if u.type === 'ai'}<span class="ai">AI</span>{/if}
