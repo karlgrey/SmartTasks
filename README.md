@@ -38,6 +38,17 @@ Ship an update:
   (JSON endpoints are exempt, which is why everything else works regardless).
 - The nightly backup must include the uploads dir alongside the sqlite file.
 
+### Attachments v2 (#201)
+
+Upload is no longer image-only: `application/pdf`, `text/plain`, `text/csv`,
+`application/zip`, and the two OOXML document types (`.docx`, `.xlsx`) are
+whitelisted alongside jpeg/png/webp — same 5 MB limit, same human-only upload
+rule, plus a server-side check that the file extension matches the MIME type.
+Non-image attachments render as a file icon (filename + size) instead of a
+thumbnail; clicking one downloads it (`GET /api/attachments/:id` sends
+`Content-Disposition: attachment; filename=…` for those, vs. `inline` for
+images, which is unchanged).
+
 Add a user / rotate an agent key (on the server, with the production DATABASE_PATH):
 
 	npx tsx scripts/create-user.ts <name> <email> [color]

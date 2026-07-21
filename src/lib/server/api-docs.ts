@@ -23,7 +23,7 @@ Task manager shared by humans and AI agents. Base URL: this host.
 | PATCH /api/tasks/:id | Partial update (same fields as create) |
 | DELETE /api/tasks/:id | Delete a task incl. comments and history — human users only (403 for AI); returns \`{"ok": true}\` |
 | POST /api/tasks/:id/comments | Add comment: {body} |
-| GET /api/attachments/:id | The attachment's image bytes. Upload/delete of attachments is human/web-UI only (403 for AI) |
+| GET /api/attachments/:id | The attachment's bytes (images inline, other types incl. PDF/docx/xlsx as a download). Upload/delete of attachments is human/web-UI only (403 for AI) |
 | GET /api/projects · POST /api/projects · PATCH /api/projects/:id | Projects: {name, color?, archived?, locationId?, wikiRef?} |
 | GET /api/locations · POST /api/locations · PATCH /api/locations/:id | Locations: create {name}, update {name?, archived?} |
 | GET /api/users | All users (id, name, type human/ai) |

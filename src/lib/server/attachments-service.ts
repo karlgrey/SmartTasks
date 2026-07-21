@@ -8,14 +8,46 @@ import type { SafeUser } from './auth';
 import type { AttachmentDTO } from '$lib/types';
 
 const MAX_SIZE = 5 * 1024 * 1024;
-const EXT: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
+
+// Accepted file extensions per MIME type (first entry is canonical, used for
+// the on-disk filename). v2 (#201) widened this from images-only to also
+// allow documents; validation still requires MIME + extension to agree.
+const MIME_EXTENSIONS: Record<string, readonly string[]> = {
+	'image/jpeg': ['jpg', 'jpeg'],
+	'image/png': ['png'],
+	'image/webp': ['webp'],
+	'application/pdf': ['pdf'],
+	'text/plain': ['txt'],
+	'text/csv': ['csv'],
+	'application/zip': ['zip'],
+	'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['docx'],
+	'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['xlsx']
+};
+
+function extOf(filename: string): string {
+	const i = filename.lastIndexOf('.');
+	return i === -1 ? '' : filename.slice(i + 1).toLowerCase();
+}
+
+export function isImageAttachment(mime: string): boolean {
+	return mime.startsWith('image/');
+}
+
+/** Content-Disposition for GET /api/attachments/:id: images stay inline
+ *  (thumbnails/full view), everything else forces a download with the
+ *  original filename (RFC 5987 for non-ASCII names). */
+export function contentDisposition(filename: string, mime: string): string {
+	if (isImageAttachment(mime)) return 'inline';
+	const ascii = filename.replace(/[^\x20-\x7e]/g, '_').replace(/"/g, "'");
+	return `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(filename)}`;
+}
 
 export function uploadsDir(): string {
 	return join(dirname(process.env.DATABASE_PATH ?? 'data/smarttasks.db'), 'uploads');
 }
 
 export function attachmentPath(a: { id: number; mime: string }, dir: string): string {
-	return join(dir, `${a.id}.${EXT[a.mime]}`);
+	return join(dir, `${a.id}.${MIME_EXTENSIONS[a.mime]?.[0] ?? 'bin'}`);
 }
 
 export type AttachmentFile = { filename: string; mime: string; data: Buffer };
@@ -28,8 +60,14 @@ export function addAttachment(
 	dir: string
 ): AttachmentDTO {
 	if (user.type === 'ai') throw new ServiceError(403, 'AI users cannot upload attachments');
-	if (!EXT[file.mime])
-		throw new ServiceError(400, `unsupported image type: must be one of ${Object.keys(EXT).join(', ')}`);
+	const allowedExts = MIME_EXTENSIONS[file.mime];
+	if (!allowedExts)
+		throw new ServiceError(
+			400,
+			`unsupported file type: must be one of ${Object.keys(MIME_EXTENSIONS).join(', ')}`
+		);
+	if (!allowedExts.includes(extOf(file.filename)))
+		throw new ServiceError(400, `file extension does not match type ${file.mime}`);
 	if (file.data.length === 0) throw new ServiceError(400, 'file is empty');
 	if (file.data.length > MAX_SIZE) throw new ServiceError(400, 'file too large (max 5 MB)');
 	if (!db.select().from(tasks).where(eq(tasks.id, taskId)).get())

@@ -99,9 +99,15 @@
 		input.value = '';
 		for (const f of files) {
 			try {
-				const blob = await downscaleImage(f);
 				const form = new FormData();
-				form.append('file', blob, f.name.replace(/\.[^.]*$/, '') + '.jpg');
+				if (f.type.startsWith('image/')) {
+					const blob = await downscaleImage(f);
+					form.append('file', blob, f.name.replace(/\.[^.]*$/, '') + '.jpg');
+				} else {
+					// Non-image attachments (PDF, docx, xlsx, …) go up unmodified — only
+					// photos get the canvas downscale.
+					form.append('file', f, f.name);
+				}
 				const res = await fetch(`/api/tasks/${id}/attachments`, { method: 'POST', body: form });
 				if (!res.ok)
 					throw new Error((await res.json().catch(() => ({}))).error ?? `HTTP ${res.status}`);
@@ -110,6 +116,22 @@
 				board.toast((err as Error).message);
 			}
 		}
+	}
+
+	const FILE_ICONS: Record<string, string> = {
+		'application/pdf': '📄',
+		'text/plain': '📝',
+		'text/csv': '📊',
+		'application/zip': '🗜️',
+		'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '📃',
+		'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': '📈'
+	};
+	const fileIcon = (mime: string) => FILE_ICONS[mime] ?? '📎';
+
+	function formatSize(bytes: number): string {
+		if (bytes < 1024) return `${bytes} B`;
+		if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+		return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 	}
 
 	async function removePhoto(attId: number) {
@@ -297,18 +319,37 @@
 			<h3>Photos</h3>
 			<div class="strip">
 				{#each detail.attachments as a (a.id)}
-					<div class="thumb">
-						<a href={`/api/attachments/${a.id}`} target="_blank" rel="noopener">
-							<img src={`/api/attachments/${a.id}`} alt={a.filename} loading="lazy" />
-						</a>
-						<button class="remove" aria-label="Delete photo" onclick={() => removePhoto(a.id)}>
-							{confirmPhotoDelete === a.id ? 'Del?' : '×'}
-						</button>
-					</div>
+					{#if a.mime.startsWith('image/')}
+						<div class="thumb">
+							<a href={`/api/attachments/${a.id}`} target="_blank" rel="noopener">
+								<img src={`/api/attachments/${a.id}`} alt={a.filename} loading="lazy" />
+							</a>
+							<button class="remove" aria-label="Delete photo" onclick={() => removePhoto(a.id)}>
+								{confirmPhotoDelete === a.id ? 'Del?' : '×'}
+							</button>
+						</div>
+					{:else}
+						<div class="thumb file">
+							<a class="file-link" href={`/api/attachments/${a.id}`} download={a.filename}>
+								<span class="file-icon" aria-hidden="true">{fileIcon(a.mime)}</span>
+								<span class="file-name">{a.filename}</span>
+								<span class="file-size">{formatSize(a.size)}</span>
+							</a>
+							<button class="remove" aria-label="Delete attachment" onclick={() => removePhoto(a.id)}>
+								{confirmPhotoDelete === a.id ? 'Del?' : '×'}
+							</button>
+						</div>
+					{/if}
 				{/each}
 				<label class="add" aria-label="Add photos">
 					+
-					<input type="file" accept="image/*" multiple hidden onchange={uploadPhotos} />
+					<input
+						type="file"
+						accept="image/*,application/pdf,text/plain,text/csv,application/zip,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.pdf,.txt,.csv,.zip,.docx,.xlsx"
+						multiple
+						hidden
+						onchange={uploadPhotos}
+					/>
 				</label>
 			</div>
 		</section>
@@ -538,6 +579,42 @@
 		border-radius: 6px;
 		border: 1px solid var(--border);
 		display: block;
+	}
+	.thumb.file {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		gap: 4px;
+		padding: 6px;
+		border-radius: 6px;
+		border: 1px solid var(--border);
+		overflow: hidden;
+	}
+	.file-link {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 4px;
+		width: 100%;
+		color: inherit;
+		text-decoration: none;
+		overflow: hidden;
+	}
+	.file-icon {
+		font-size: 26px;
+		line-height: 1;
+	}
+	.file-name {
+		font-size: 11px;
+		max-width: 100%;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+	.file-size {
+		font-size: 10px;
+		color: var(--muted);
 	}
 	.thumb .remove {
 		position: absolute;

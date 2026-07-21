@@ -4,7 +4,13 @@ import type { RequestHandler } from './$types';
 import { db } from '$lib/server/db';
 import { run, requireUser } from '$lib/server/api-utils';
 import { ServiceError } from '$lib/server/errors';
-import { getAttachment, deleteAttachment, attachmentPath, uploadsDir } from '$lib/server/attachments-service';
+import {
+	getAttachment,
+	deleteAttachment,
+	attachmentPath,
+	uploadsDir,
+	contentDisposition
+} from '$lib/server/attachments-service';
 
 export const GET: RequestHandler = ({ locals, params }) =>
 	run(() => {
@@ -20,6 +26,7 @@ export const GET: RequestHandler = ({ locals, params }) =>
 			headers: {
 				'content-type': attachment.mime,
 				'content-length': String(data.length),
+				'content-disposition': contentDisposition(attachment.filename, attachment.mime),
 				// content is immutable: replacing a photo creates a new id
 				'cache-control': 'private, max-age=31536000, immutable'
 			}

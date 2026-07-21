@@ -9,10 +9,12 @@ import {
 	getAttachment,
 	deleteAttachment,
 	deleteTaskAttachments,
-	attachmentPath
+	attachmentPath,
+	contentDisposition
 } from './attachments-service';
 
 const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 1, 2, 3]);
+const pdf = Buffer.from('%PDF-1.4\n%fake');
 
 describe('attachments-service', () => {
 	let db: ReturnType<typeof testDb>;
@@ -46,13 +48,54 @@ describe('attachments-service', () => {
 		const f = { filename: 'p.png', mime: 'image/png', data: png };
 		expect(() => addAttachment(db, users.micha, 999, f, dir)).toThrowError(/task not found/);
 		expect(() =>
-			addAttachment(db, users.micha, taskId, { ...f, mime: 'application/pdf' }, dir)
+			addAttachment(db, users.micha, taskId, { ...f, filename: 'virus.exe', mime: 'application/octet-stream' }, dir)
 		).toThrowError(/unsupported/);
 		expect(() =>
 			addAttachment(db, users.micha, taskId, { ...f, data: Buffer.alloc(5 * 1024 * 1024 + 1) }, dir)
 		).toThrowError(/too large/);
 		expect(() => addAttachment(db, users.micha, taskId, { ...f, data: Buffer.alloc(0) }, dir)).toThrowError(
 			/empty/
+		);
+	});
+
+	it('rejects filename/MIME mismatch', () => {
+		expect(() =>
+			addAttachment(db, users.micha, taskId, { filename: 'report.txt', mime: 'application/pdf', data: pdf }, dir)
+		).toThrowError(/extension does not match/);
+	});
+
+	it('accepts PDF and other whitelisted v2 document types (#201)', () => {
+		const a = addAttachment(
+			db,
+			users.micha,
+			taskId,
+			{ filename: 'report.pdf', mime: 'application/pdf', data: pdf },
+			dir
+		);
+		expect(a.mime).toBe('application/pdf');
+		expect(existsSync(attachmentPath(a, dir))).toBe(true);
+		expect(attachmentPath(a, dir).endsWith('.pdf')).toBe(true);
+
+		for (const [mime, filename] of [
+			['text/plain', 'notes.txt'],
+			['text/csv', 'export.csv'],
+			['application/zip', 'archive.zip'],
+			['application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'doc.docx'],
+			['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'sheet.xlsx']
+		] as const) {
+			const row = addAttachment(db, users.micha, taskId, { filename, mime, data: pdf }, dir);
+			expect(row.mime).toBe(mime);
+			expect(existsSync(attachmentPath(row, dir))).toBe(true);
+		}
+	});
+
+	it('contentDisposition: inline for images, attachment+filename for everything else', () => {
+		expect(contentDisposition('p.png', 'image/png')).toBe('inline');
+		expect(contentDisposition('report.pdf', 'application/pdf')).toBe(
+			`attachment; filename="report.pdf"; filename*=UTF-8''report.pdf`
+		);
+		expect(contentDisposition('Übergabe.pdf', 'application/pdf')).toContain(
+			"filename*=UTF-8''%C3%9Cbergabe.pdf"
 		);
 	});
 
