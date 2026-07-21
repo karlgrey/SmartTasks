@@ -316,7 +316,7 @@
 		</section>
 
 		<section class="photos">
-			<h3>Photos</h3>
+			<h3>Photos &amp; Files</h3>
 			<div class="strip">
 				{#each detail.attachments as a (a.id)}
 					{#if a.mime.startsWith('image/')}
