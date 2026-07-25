@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { listTasks, createTask, parseTaskFilters, getTask, updateTask, deleteTask } from './tasks-service';
 import { testDb, seedUsers } from './test-utils';
@@ -128,6 +128,24 @@ describe('listTasks', () => {
 		expect(listTasks(db, { location: schiff.id, open: true })).toHaveLength(1);
 		expect(listTasks(db, { location: 999 })).toEqual([]);
 	});
+
+	it('filters by today: open tasks due today or earlier (Europe/Berlin), no dueDate excluded', () => {
+		vi.useFakeTimers();
+		vi.setSystemTime(new Date('2026-07-25T10:00:00Z')); // 12:00 CEST, still the 25th in Berlin
+		const db = testDb();
+		const { micha } = seedUsers(db);
+		const overdue = createTask(db, micha, { title: 'Overdue', dueDate: '2026-07-20' });
+		const dueToday = createTask(db, micha, { title: 'Due today', dueDate: '2026-07-25' });
+		createTask(db, micha, { title: 'Due tomorrow', dueDate: '2026-07-26' });
+		createTask(db, micha, { title: 'No due date' });
+		createTask(db, micha, { title: 'Done, due today', dueDate: '2026-07-25', status: 'Done' });
+		expect(
+			listTasks(db, { today: true })
+				.map((t) => t.id)
+				.sort((a, b) => a - b)
+		).toEqual([overdue.id, dueToday.id].sort((a, b) => a - b));
+		vi.useRealTimers();
+	});
 });
 
 describe('parseTaskFilters', () => {
@@ -141,6 +159,11 @@ describe('parseTaskFilters', () => {
 
 	it('parses the location param', () => {
 		expect(parseTaskFilters(new URLSearchParams('location=7'))).toEqual({ location: 7 });
+	});
+
+	it('parses the today param', () => {
+		expect(parseTaskFilters(new URLSearchParams('today=true'))).toEqual({ today: true });
+		expect(parseTaskFilters(new URLSearchParams('today=false'))).toEqual({});
 	});
 });
 

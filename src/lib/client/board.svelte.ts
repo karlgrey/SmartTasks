@@ -1,5 +1,6 @@
 import type { TaskDTO, UserDTO, ProjectDTO, LocationDTO } from '$lib/types';
 import { parseTicketQuery } from '$lib/ticket-query';
+import { todayInBerlin } from '$lib/date-utils';
 import { api } from './api';
 
 const PRIORITY_ORDER: Record<string, number> = { 'Super-High': 0, High: 1, Medium: 2, Low: 3 };
@@ -54,6 +55,8 @@ class BoardState {
 		const assignee = params.get('assignee');
 		const project = params.get('project');
 		const location = params.get('location');
+		const today = params.get('today') === 'true';
+		const todayStr = today ? todayInBerlin() : null;
 		const q = params.get('q')?.toLowerCase();
 		const ticket = q ? parseTicketQuery(q) : null;
 		return this.tasks
@@ -63,6 +66,7 @@ class BoardState {
 					(!project || String(t.projectId) === project) &&
 					(!location ||
 						this.projects.find((p) => p.id === t.projectId)?.locationId === Number(location)) &&
+					(!today || (t.status !== 'Done' && t.dueDate !== null && t.dueDate <= todayStr!)) &&
 					(!q ||
 						t.title.toLowerCase().includes(q) ||
 						t.description.toLowerCase().includes(q) ||
