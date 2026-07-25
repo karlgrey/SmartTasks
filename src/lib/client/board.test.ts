@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { compareTasks, compareDone, board } from './board.svelte';
 import type { TaskDTO, LocationDTO, ProjectDTO } from '$lib/types';
 
@@ -77,6 +77,53 @@ describe('location filter', () => {
 			locations: [{ id: 5, name: 'Schiffmühle', archived: false }]
 		});
 		expect(board.filtered(new URLSearchParams('location=5')).map((t) => t.id)).toEqual([1]);
+	});
+});
+
+describe('today filter', () => {
+	afterEach(() => vi.useRealTimers());
+
+	it('keeps only open tasks due today or earlier (Europe/Berlin), sorted like the board', () => {
+		vi.useFakeTimers();
+		vi.setSystemTime(new Date('2026-07-25T10:00:00Z')); // 12:00 CEST, still the 25th in Berlin
+		const overdue = task({ id: 1, dueDate: '2026-07-20' });
+		const dueToday = task({ id: 2, dueDate: '2026-07-25' });
+		const dueTomorrow = task({ id: 3, dueDate: '2026-07-26' });
+		const noDue = task({ id: 4, dueDate: null });
+		const doneToday = task({ id: 5, dueDate: '2026-07-25', status: 'Done' });
+		board.init({
+			user: { id: 1, name: 'M', email: null, type: 'human', color: '#fff' },
+			tasks: [dueTomorrow, noDue, doneToday, dueToday, overdue],
+			done: [],
+			users: [],
+			projects: [],
+			locations: []
+		});
+		expect(board.filtered(new URLSearchParams('today=true')).map((t) => t.id)).toEqual([
+			overdue.id,
+			dueToday.id
+		]);
+	});
+
+	it('combines with other filters (assignee) — today AND assignee, not either alone', () => {
+		vi.useFakeTimers();
+		vi.setSystemTime(new Date('2026-07-25T10:00:00Z'));
+		const mine = task({ id: 1, dueDate: '2026-07-25', assigneeId: 1 });
+		// same assignee, but due tomorrow: excluded only by the today filter
+		const mineTomorrow = task({ id: 2, dueDate: '2026-07-26', assigneeId: 1 });
+		// due today, but someone else's: excluded only by the assignee filter
+		const someoneElses = task({ id: 3, dueDate: '2026-07-25', assigneeId: 2 });
+		board.init({
+			user: { id: 1, name: 'M', email: null, type: 'human', color: '#fff' },
+			tasks: [mine, mineTomorrow, someoneElses],
+			done: [],
+			users: [],
+			projects: [],
+			locations: []
+		});
+		expect(
+			board.filtered(new URLSearchParams('today=true&assignee=1')).map((t) => t.id)
+		).toEqual([mine.id]);
 	});
 });
 

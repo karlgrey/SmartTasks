@@ -21,6 +21,10 @@
 		const val = String(id);
 		setParam('assignee', current.get('assignee') === val ? null : val);
 	}
+
+	function toggleToday() {
+		setParam('today', current.get('today') === 'true' ? null : 'true');
+	}
 </script>
 
 <nav>
@@ -49,6 +53,14 @@
 			<option value={l.id} selected={current.get('location') === String(l.id)}>{l.name}</option>
 		{/each}
 	</select>
+	<button
+		class="chip"
+		class:active={current.get('today') === 'true'}
+		style="--c:var(--accent)"
+		onclick={toggleToday}
+	>
+		Today
+	</button>
 	<input
 		type="search"
 		placeholder="Search…"

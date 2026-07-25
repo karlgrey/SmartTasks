@@ -6,6 +6,7 @@ import type { SafeUser } from './auth';
 import { deleteTaskAttachments, uploadsDir } from './attachments-service';
 import { STATUSES, PRIORITIES, SIZES, type Status, type Priority, type Size, type TaskDTO, type CommentDTO, type StatusEventDTO, type AttachmentDTO, type DocRefDTO } from '$lib/types';
 import { parseTicketQuery } from '$lib/ticket-query';
+import { todayInBerlin } from '$lib/date-utils';
 import { listDocRefsForTask } from './documents-service';
 
 export type TaskFilters = {
@@ -14,6 +15,7 @@ export type TaskFilters = {
 	location?: number;
 	status?: Status;
 	open?: boolean;
+	today?: boolean;
 	q?: string;
 	limit?: number;
 	offset?: number;
@@ -91,6 +93,11 @@ export function listTasks(db: Db, filters: TaskFilters = {}): TaskDTO[] {
 		);
 	if (filters.status) conds.push(eq(tasks.status, filters.status));
 	if (filters.open) conds.push(ne(tasks.status, 'Done'));
+	if (filters.today) {
+		// open tasks due today or earlier, "today" being Europe/Berlin-local
+		conds.push(ne(tasks.status, 'Done'));
+		conds.push(sql`${tasks.dueDate} IS NOT NULL AND ${tasks.dueDate} <= ${todayInBerlin()}`);
+	}
 	if (filters.q) {
 		const pattern = `%${filters.q}%`;
 		const text = or(like(tasks.title, pattern), like(tasks.description, pattern))!;
@@ -162,6 +169,7 @@ export function parseTaskFilters(params: URLSearchParams): TaskFilters {
 	const status = params.get('status');
 	if (status) f.status = status as Status;
 	if (params.get('open') === 'true') f.open = true;
+	if (params.get('today') === 'true') f.today = true;
 	const q = params.get('q');
 	if (q) f.q = q;
 	const limit = params.get('limit');
