@@ -27,7 +27,7 @@
 	<span class="meta">
 		{#if task.priority}<span class="badge prio-{task.priority.toLowerCase()}">{task.priority}</span>{/if}
 		{#if task.size}<span class="badge">{task.size}</span>{/if}
-		{#if project}<span class="badge" style="background:{project.color}22;color:{project.color}">{project.name}</span>{/if}
+		{#if project}<span class="badge" style="background:{project.color}22;color:{project.color}">{project.ownerId != null ? '🔒 ' : ''}{project.name}</span>{/if}
 		{#if location}<span class="badge">{location.name}</span>{/if}
 		{#if task.dueDate}<span class="badge" class:overdue>{task.dueDate}</span>{/if}
 		{#if assignee}<span class="avatar" style="background:{assignee.color}" title={assignee.name}>{assignee.name[0]}</span>{/if}
