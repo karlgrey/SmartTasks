@@ -33,7 +33,8 @@ export const projects = sqliteTable('projects', {
 	color: text('color').notNull().default('#6b7280'),
 	archived: integer('archived', { mode: 'boolean' }).notNull().default(false),
 	locationId: integer('location_id').references(() => locations.id),
-	wikiRef: text('wiki_ref')
+	wikiRef: text('wiki_ref'),
+	ownerId: integer('owner_id').references(() => users.id)
 });
 
 export const tasks = sqliteTable('tasks', {

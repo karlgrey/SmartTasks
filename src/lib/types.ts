@@ -30,6 +30,7 @@ export type ProjectDTO = {
 	archived: boolean;
 	locationId: number | null;
 	wikiRef: string | null;
+	ownerId: number | null;
 };
 
 export type TaskDTO = {

@@ -71,8 +71,16 @@ describe('location filter', () => {
 			done: [],
 			users: [],
 			projects: [
-				{ id: 10, name: 'Teichbau', color: '#fff', archived: false, locationId: 5, wikiRef: null },
-				{ id: 20, name: 'Elsewhere', color: '#fff', archived: false, locationId: null, wikiRef: null }
+				{ id: 10, name: 'Teichbau', color: '#fff', archived: false, locationId: 5, wikiRef: null, ownerId: null },
+				{
+					id: 20,
+					name: 'Elsewhere',
+					color: '#fff',
+					archived: false,
+					locationId: null,
+					wikiRef: null,
+					ownerId: null
+				}
 			],
 			locations: [{ id: 5, name: 'Schiffmühle', archived: false }]
 		});

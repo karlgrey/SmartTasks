@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createDb } from './index';
 import { tasks, users, locations, projects, statusEvents } from './schema';
+import { testDb, seedUsers } from '../test-utils';
 
 describe('db', () => {
 	it('creates schema and round-trips a task', () => {
@@ -55,5 +56,14 @@ describe('db', () => {
 			.get();
 		expect(ev.fromStatus).toBeNull();
 		expect(ev.toStatus).toBe('Inbox');
+	});
+
+	it('projects have a nullable ownerId (private projects)', () => {
+		const db = testDb();
+		const { micha } = seedUsers(db);
+		const pub = db.insert(projects).values({ name: 'Team' }).returning().get();
+		expect(pub.ownerId).toBeNull();
+		const priv = db.insert(projects).values({ name: 'Privat', ownerId: micha.id }).returning().get();
+		expect(priv.ownerId).toBe(micha.id);
 	});
 });
