@@ -20,7 +20,8 @@
 
 	const id = $derived(Number(page.params.id));
 	const isHuman = $derived(data.user.type === 'human');
-	const projectName = $derived(data.projects.find((p) => p.id === doc?.projectId)?.name ?? null);
+	const project = $derived(data.projects.find((p) => p.id === doc?.projectId) ?? null);
+	const projectName = $derived(project ? `${project.ownerId != null ? '🔒 ' : ''}${project.name}` : null);
 	const userName = (uid: number) => data.users.find((u) => u.id === uid)?.name ?? '—';
 	const fmt = (iso: string) => iso.slice(0, 16).replace('T', ' ');
 
@@ -120,7 +121,7 @@
 			<select bind:value={editProject} aria-label="Project">
 				<option value="">No project</option>
 				{#each data.projects.filter((p) => !p.archived) as p (p.id)}
-					<option value={p.id}>{p.name}</option>
+					<option value={p.id}>{p.ownerId != null ? `🔒 ${p.name}` : p.name}</option>
 				{/each}
 			</select>
 			<div class="split">

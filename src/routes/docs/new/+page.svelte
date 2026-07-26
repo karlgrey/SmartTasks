@@ -40,7 +40,7 @@
 	<select bind:value={projectId} aria-label="Project">
 		<option value="">No project</option>
 		{#each data.projects.filter((p) => !p.archived) as p (p.id)}
-			<option value={p.id}>{p.name}</option>
+			<option value={p.id}>{p.ownerId != null ? `🔒 ${p.name}` : p.name}</option>
 		{/each}
 	</select>
 	<textarea placeholder="Write Markdown…" bind:value={body}></textarea>

@@ -1,9 +1,10 @@
 import { and, eq, or, like, asc, desc, type SQL } from 'drizzle-orm';
 import type { Db } from './db';
-import { documents, documentTasks, tasks } from './db/schema';
+import { documents, documentTasks, tasks, projects } from './db/schema';
 import { ServiceError } from './errors';
 import type { SafeUser } from './auth';
 import type { DocumentDTO, TaskRefDTO, DocRefDTO } from '$lib/types';
+import { assertProjectUsable, assertTaskVisible, canSeeProject, documentVisibilityCond, taskVisibilityCond } from './visibility';
 
 export type DocFilters = {
 	project?: number;
@@ -17,11 +18,6 @@ export type DocumentInput = {
 	body?: string;
 	projectId?: number | null;
 };
-
-function assertProjectId(value: unknown): void {
-	if (value !== null && value !== undefined && typeof value !== 'number')
-		throw new ServiceError(400, 'invalid projectId: must be a number');
-}
 
 function assertBody(value: unknown): void {
 	if (value !== null && value !== undefined && typeof value !== 'string')
@@ -41,13 +37,15 @@ export function parseDocFilters(params: URLSearchParams): DocFilters {
 	return f;
 }
 
-export function listDocuments(db: Db, filters: DocFilters = {}): DocumentDTO[] {
+export function listDocuments(db: Db, user: SafeUser, filters: DocFilters = {}): DocumentDTO[] {
 	const conds: SQL[] = [];
 	if (filters.project !== undefined) conds.push(eq(documents.projectId, filters.project));
 	if (filters.q) {
 		const pattern = `%${filters.q}%`;
 		conds.push(or(like(documents.title, pattern), like(documents.body, pattern))!);
 	}
+	const vis = documentVisibilityCond(user);
+	if (vis) conds.push(vis);
 	return db
 		.select()
 		.from(documents)
@@ -62,7 +60,7 @@ export function createDocument(db: Db, user: SafeUser, input: DocumentInput): Do
 	if (typeof input.title !== 'string' || !input.title.trim())
 		throw new ServiceError(400, 'title is required');
 	assertBody(input.body);
-	assertProjectId(input.projectId);
+	assertProjectUsable(db, user, input.projectId);
 	const now = new Date().toISOString();
 	return db
 		.insert(documents)
@@ -78,20 +76,34 @@ export function createDocument(db: Db, user: SafeUser, input: DocumentInput): Do
 		.get();
 }
 
-function taskRefs(db: Db, documentId: number): TaskRefDTO[] {
+function taskRefs(db: Db, user: SafeUser, documentId: number): TaskRefDTO[] {
+	const conds: SQL[] = [eq(documentTasks.documentId, documentId)];
+	const vis = taskVisibilityCond(user);
+	if (vis) conds.push(vis);
 	return db
 		.select({ id: tasks.id, title: tasks.title, status: tasks.status })
 		.from(documentTasks)
 		.innerJoin(tasks, eq(tasks.id, documentTasks.taskId))
-		.where(eq(documentTasks.documentId, documentId))
+		.where(and(...conds))
 		.orderBy(asc(tasks.id))
 		.all();
 }
 
-export function getDocument(db: Db, id: number): DocumentDTO & { tasks: TaskRefDTO[] } {
+function assertDocVisible(db: Db, user: SafeUser, doc: { projectId: number | null }): void {
+	if (doc.projectId === null) return;
+	const project = db.select().from(projects).where(eq(projects.id, doc.projectId)).get();
+	if (project && !canSeeProject(user, project)) throw new ServiceError(404, 'document not found');
+}
+
+export function getDocument(
+	db: Db,
+	user: SafeUser,
+	id: number
+): DocumentDTO & { tasks: TaskRefDTO[] } {
 	const doc = db.select().from(documents).where(eq(documents.id, id)).get();
 	if (!doc) throw new ServiceError(404, 'document not found');
-	return { ...doc, tasks: taskRefs(db, id) };
+	assertDocVisible(db, user, doc);
+	return { ...doc, tasks: taskRefs(db, user, id) };
 }
 
 const UPDATABLE = ['title', 'body', 'projectId'] as const;
@@ -104,10 +116,11 @@ export function updateDocument(
 ): DocumentDTO {
 	const existing = db.select().from(documents).where(eq(documents.id, id)).get();
 	if (!existing) throw new ServiceError(404, 'document not found');
+	assertDocVisible(db, user, existing);
 	if (patch.title !== undefined && (typeof patch.title !== 'string' || !patch.title.trim()))
 		throw new ServiceError(400, 'title is required');
 	assertBody(patch.body);
-	if ('projectId' in patch) assertProjectId(patch.projectId);
+	if ('projectId' in patch) assertProjectUsable(db, user, patch.projectId);
 
 	const next: Record<string, unknown> = { updatedAt: new Date().toISOString() };
 	for (const key of UPDATABLE) {
@@ -120,6 +133,7 @@ export function deleteDocument(db: Db, user: SafeUser, id: number): DocumentDTO 
 	if (user.type === 'ai') throw new ServiceError(403, 'AI users cannot delete documents');
 	const existing = db.select().from(documents).where(eq(documents.id, id)).get();
 	if (!existing) throw new ServiceError(404, 'document not found');
+	assertDocVisible(db, user, existing);
 	db.transaction((tx) => {
 		tx.delete(documentTasks).where(eq(documentTasks.documentId, id)).run();
 		tx.delete(documents).where(eq(documents.id, id)).run();
@@ -127,35 +141,45 @@ export function deleteDocument(db: Db, user: SafeUser, id: number): DocumentDTO 
 	return existing;
 }
 
-function assertDocExists(db: Db, documentId: number): void {
-	if (!db.select().from(documents).where(eq(documents.id, documentId)).get())
-		throw new ServiceError(404, 'document not found');
+function assertDocExists(db: Db, user: SafeUser, documentId: number): void {
+	const doc = db.select().from(documents).where(eq(documents.id, documentId)).get();
+	if (!doc) throw new ServiceError(404, 'document not found');
+	assertDocVisible(db, user, doc);
 }
 
-function assertTaskExists(db: Db, taskId: number): void {
-	if (!db.select().from(tasks).where(eq(tasks.id, taskId)).get())
-		throw new ServiceError(404, 'task not found');
+function assertTaskExists(db: Db, user: SafeUser, taskId: number): void {
+	const task = db.select().from(tasks).where(eq(tasks.id, taskId)).get();
+	if (!task) throw new ServiceError(404, 'task not found');
+	assertTaskVisible(db, user, task);
 }
 
 export function linkTask(db: Db, user: SafeUser, documentId: number, taskId: number): void {
-	assertDocExists(db, documentId);
-	assertTaskExists(db, taskId);
+	assertDocExists(db, user, documentId);
+	assertTaskExists(db, user, taskId);
 	db.insert(documentTasks).values({ documentId, taskId }).onConflictDoNothing().run();
 }
 
 export function unlinkTask(db: Db, user: SafeUser, documentId: number, taskId: number): void {
-	assertDocExists(db, documentId);
+	assertDocExists(db, user, documentId);
+	// A foreign-private task must not be un-linked by someone who can't see it
+	// (linkTask checks both sides — unlink must too). A task row that no
+	// longer exists (deleteTask's cleanup path) stays a no-op delete.
+	const task = db.select().from(tasks).where(eq(tasks.id, taskId)).get();
+	if (task) assertTaskVisible(db, user, task);
 	db.delete(documentTasks)
 		.where(and(eq(documentTasks.documentId, documentId), eq(documentTasks.taskId, taskId)))
 		.run();
 }
 
-export function listDocRefsForTask(db: Db, taskId: number): DocRefDTO[] {
+export function listDocRefsForTask(db: Db, user: SafeUser, taskId: number): DocRefDTO[] {
+	const conds: SQL[] = [eq(documentTasks.taskId, taskId)];
+	const vis = documentVisibilityCond(user);
+	if (vis) conds.push(vis);
 	return db
 		.select({ id: documents.id, title: documents.title })
 		.from(documentTasks)
 		.innerJoin(documents, eq(documents.id, documentTasks.documentId))
-		.where(eq(documentTasks.taskId, taskId))
+		.where(and(...conds))
 		.orderBy(asc(documents.title))
 		.all();
 }

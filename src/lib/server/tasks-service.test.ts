@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { listTasks, createTask, parseTaskFilters, getTask, updateTask, deleteTask } from './tasks-service';
 import { testDb, seedUsers } from './test-utils';
+import { createUser } from './auth';
 import { tasks } from './db/schema';
 import { createLocation } from './locations-service';
 import { createProject } from './projects-service';
@@ -10,6 +11,7 @@ import { mkdtempSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { addAttachment, attachmentPath } from './attachments-service';
+import { createDocument, linkTask } from './documents-service';
 
 describe('createTask', () => {
 	it('creates with defaults and rejects empty titles and bad enums', () => {
@@ -68,22 +70,22 @@ describe('listTasks', () => {
 
 	it('sorts by priority, then due date, then age', () => {
 		const db = testDb();
-		seed(db);
-		expect(listTasks(db).map((t) => t.title)).toEqual([
+		const { micha } = seed(db);
+		expect(listTasks(db, micha).map((t) => t.title)).toEqual([
 			'Urgent', 'Low prio', 'No prio, has due', 'Done already'
 		]);
 	});
 
 	it('filters by open, assignee (id or name, case-insensitive), q, status, limit', () => {
 		const db = testDb();
-		const { claude } = seed(db);
-		expect(listTasks(db, { open: true }).map((t) => t.title)).not.toContain('Done already');
-		expect(listTasks(db, { assignee: String(claude.id) })[0].title).toBe('Urgent');
-		expect(listTasks(db, { assignee: 'claude' })[0].title).toBe('Urgent');
-		expect(listTasks(db, { assignee: 'nobody' })).toEqual([]);
-		expect(listTasks(db, { q: 'urg' }).map((t) => t.title)).toEqual(['Urgent']);
-		expect(listTasks(db, { status: 'Done' }).map((t) => t.title)).toEqual(['Done already']);
-		expect(listTasks(db, { limit: 2 })).toHaveLength(2);
+		const { micha, claude } = seed(db);
+		expect(listTasks(db, micha, { open: true }).map((t) => t.title)).not.toContain('Done already');
+		expect(listTasks(db, micha, { assignee: String(claude.id) })[0].title).toBe('Urgent');
+		expect(listTasks(db, micha, { assignee: 'claude' })[0].title).toBe('Urgent');
+		expect(listTasks(db, micha, { assignee: 'nobody' })).toEqual([]);
+		expect(listTasks(db, micha, { q: 'urg' }).map((t) => t.title)).toEqual(['Urgent']);
+		expect(listTasks(db, micha, { status: 'Done' }).map((t) => t.title)).toEqual(['Done already']);
+		expect(listTasks(db, micha, { limit: 2 })).toHaveLength(2);
 	});
 
 	it('q matches ticket ids: exact for plain numbers, prefix for the #-form', () => {
@@ -96,13 +98,13 @@ describe('listTasks', () => {
 		insert(186, 'Anderes');
 		insert(200, 'Rechnung 186 prüfen');
 		// plain number: exact id hit PLUS normal text hits
-		expect(listTasks(db, { q: '186' }).map((t) => t.id).sort()).toEqual([186, 200]);
+		expect(listTasks(db, micha, { q: '186' }).map((t) => t.id).sort()).toEqual([186, 200]);
 		// #-form: exact
-		expect(listTasks(db, { q: '#186' }).map((t) => t.id)).toEqual([186]);
+		expect(listTasks(db, micha, { q: '#186' }).map((t) => t.id)).toEqual([186]);
 		// #-form: id prefix (incremental typing)
-		expect(listTasks(db, { q: '#18' }).map((t) => t.id).sort()).toEqual([18, 186]);
+		expect(listTasks(db, micha, { q: '#18' }).map((t) => t.id).sort()).toEqual([18, 186]);
 		// plain number does not prefix-match ids (200 matches via '18' in its title)
-		expect(listTasks(db, { q: '18' }).map((t) => t.id).sort()).toEqual([18, 200]);
+		expect(listTasks(db, micha, { q: '18' }).map((t) => t.id).sort()).toEqual([18, 200]);
 	});
 
 	it('orders the Done column by most recently completed, not boardOrder', () => {
@@ -112,21 +114,21 @@ describe('listTasks', () => {
 		const newer = createTask(db, micha, { title: 'Newer done', status: 'Done', priority: 'Low' });
 		db.update(tasks).set({ completedAt: '2026-01-01T00:00:00.000Z' }).where(eq(tasks.id, older.id)).run();
 		db.update(tasks).set({ completedAt: '2026-02-01T00:00:00.000Z' }).where(eq(tasks.id, newer.id)).run();
-		expect(listTasks(db, { status: 'Done', limit: 1 })[0].title).toBe('Newer done');
+		expect(listTasks(db, micha, { status: 'Done', limit: 1 })[0].title).toBe('Newer done');
 	});
 
 	it('filters by location via the task project', () => {
 		const db = testDb();
 		const { micha } = seedUsers(db);
 		const schiff = createLocation(db, { name: 'Schiffmühle' });
-		const teich = createProject(db, { name: 'Teichbau', locationId: schiff.id });
-		const other = createProject(db, { name: 'Elsewhere' });
+		const teich = createProject(db, micha, { name: 'Teichbau', locationId: schiff.id });
+		const other = createProject(db, micha, { name: 'Elsewhere' });
 		createTask(db, micha, { title: 'Teich ausheben', projectId: teich.id });
 		createTask(db, micha, { title: 'Other work', projectId: other.id });
 		createTask(db, micha, { title: 'No project' });
-		expect(listTasks(db, { location: schiff.id }).map((t) => t.title)).toEqual(['Teich ausheben']);
-		expect(listTasks(db, { location: schiff.id, open: true })).toHaveLength(1);
-		expect(listTasks(db, { location: 999 })).toEqual([]);
+		expect(listTasks(db, micha, { location: schiff.id }).map((t) => t.title)).toEqual(['Teich ausheben']);
+		expect(listTasks(db, micha, { location: schiff.id, open: true })).toHaveLength(1);
+		expect(listTasks(db, micha, { location: 999 })).toEqual([]);
 	});
 
 	it('filters by today: open tasks due today or earlier (Europe/Berlin), no dueDate excluded', () => {
@@ -140,7 +142,7 @@ describe('listTasks', () => {
 		createTask(db, micha, { title: 'No due date' });
 		createTask(db, micha, { title: 'Done, due today', dueDate: '2026-07-25', status: 'Done' });
 		expect(
-			listTasks(db, { today: true })
+			listTasks(db, micha, { today: true })
 				.map((t) => t.id)
 				.sort((a, b) => a - b)
 		).toEqual([overdue.id, dueToday.id].sort((a, b) => a - b));
@@ -172,7 +174,7 @@ describe('getTask', () => {
 		const db = testDb();
 		const { micha } = seedUsers(db);
 		const t = createTask(db, micha, { title: 'With comments' });
-		const detail = getTask(db, t.id);
+		const detail = getTask(db, micha, t.id);
 		expect(detail.comments).toEqual([]);
 		expect(detail.statusEvents).toHaveLength(1);
 		expect(detail.statusEvents[0]).toMatchObject({
@@ -180,7 +182,7 @@ describe('getTask', () => {
 			toStatus: 'Inbox',
 			userId: micha.id
 		});
-		expect(() => getTask(db, 999)).toThrowError('task not found');
+		expect(() => getTask(db, micha, 999)).toThrowError('task not found');
 	});
 });
 
@@ -248,6 +250,16 @@ describe('updateTask', () => {
 			updateTask(db, micha, t.id, { hours: 'abc' })
 		).toThrowError('invalid hours: must be a number');
 	});
+
+	it('validates projectId type before resolving it as a project (order matches createTask)', () => {
+		const db = testDb();
+		const { micha } = seedUsers(db);
+		const t = createTask(db, micha, { title: 'x' });
+		expect(() =>
+			// @ts-expect-error invalid type on purpose
+			updateTask(db, micha, t.id, { projectId: 'abc' })
+		).toThrowError('invalid projectId: must be a number');
+	});
 });
 
 describe('status events', () => {
@@ -255,7 +267,7 @@ describe('status events', () => {
 		const db = testDb();
 		const { micha, claude } = seedUsers(db);
 		const t = createTask(db, micha, { title: 'Track me', status: 'To Do' });
-		let detail = getTask(db, t.id);
+		let detail = getTask(db, micha, t.id);
 		expect(detail.statusEvents).toHaveLength(1);
 		expect(detail.statusEvents[0]).toMatchObject({
 			fromStatus: null,
@@ -265,7 +277,7 @@ describe('status events', () => {
 		});
 
 		const updated = updateTask(db, claude, t.id, { status: 'In Progress' });
-		detail = getTask(db, t.id);
+		detail = getTask(db, micha, t.id);
 		expect(detail.statusEvents).toHaveLength(2);
 		expect(detail.statusEvents[1]).toMatchObject({
 			fromStatus: 'To Do',
@@ -281,7 +293,7 @@ describe('status events', () => {
 		const t = createTask(db, micha, { title: 'Quiet' });
 		updateTask(db, micha, t.id, { status: 'Inbox' });
 		updateTask(db, micha, t.id, { title: 'Still quiet' });
-		expect(getTask(db, t.id).statusEvents).toHaveLength(1);
+		expect(getTask(db, micha, t.id).statusEvents).toHaveLength(1);
 	});
 
 	it('orders same-timestamp events by insertion order, not just createdAt', () => {
@@ -290,7 +302,7 @@ describe('status events', () => {
 		const t = createTask(db, micha, { title: 'Fast mover' });
 		updateTask(db, micha, t.id, { status: 'To Do' });
 		updateTask(db, micha, t.id, { status: 'Review' });
-		const detail = getTask(db, t.id);
+		const detail = getTask(db, micha, t.id);
 		expect(detail.statusEvents.map((e) => e.toStatus)).toEqual(['Inbox', 'To Do', 'Review']);
 	});
 });
@@ -305,7 +317,7 @@ describe('deleteTask', () => {
 		expect(() => deleteTask(db, claude, t.id)).toThrowError('AI users cannot delete tasks');
 		const deleted = deleteTask(db, micha, t.id);
 		expect(deleted.id).toBe(t.id);
-		expect(() => getTask(db, t.id)).toThrowError('task not found');
+		expect(() => getTask(db, micha, t.id)).toThrowError('task not found');
 		expect(() => deleteTask(db, micha, t.id)).toThrowError('task not found');
 	});
 
@@ -319,10 +331,70 @@ describe('deleteTask', () => {
 			{ filename: 'p.png', mime: 'image/png', data: Buffer.from([1, 2, 3]) },
 			dir
 		);
-		expect(getTask(db, task.id).attachments).toEqual([a]);
+		expect(getTask(db, micha, task.id).attachments).toEqual([a]);
 		deleteTask(db, micha, task.id, dir);
 		expect(existsSync(attachmentPath(a, dir))).toBe(false);
-		expect(() => getTask(db, task.id)).toThrowError(/not found/);
+		expect(() => getTask(db, micha, task.id)).toThrowError(/not found/);
 		rmSync(dir, { recursive: true, force: true });
+	});
+});
+
+describe('private projects — task visibility', () => {
+	function privateSetup() {
+		const db = testDb();
+		const { micha, claude } = seedUsers(db);
+		const ulf = createUser(db, { name: 'Ulf', type: 'human' });
+		const priv = createProject(db, micha, { name: 'Privat', ownerId: micha.id });
+		const t = createTask(db, micha, { title: 'geheim', projectId: priv.id, dueDate: '2020-01-01' });
+		return { db, micha, claude, ulf, priv, t };
+	}
+
+	it('hides tasks of foreign private projects from list, search and today', () => {
+		const { db, micha, ulf, claude } = privateSetup();
+		expect(listTasks(db, micha).map((t) => t.title)).toContain('geheim');
+		expect(listTasks(db, ulf)).toHaveLength(0);
+		expect(listTasks(db, ulf, { q: 'geheim' })).toHaveLength(0);
+		expect(listTasks(db, claude).map((t) => t.title)).toContain('geheim');
+		expect(listTasks(db, ulf, { today: true })).toHaveLength(0);
+		expect(listTasks(db, micha, { today: true }).length).toBeGreaterThan(0);
+	});
+
+	it('getTask/updateTask/deleteTask answer 404 for non-owners', () => {
+		const { db, ulf, t } = privateSetup();
+		expect(() => getTask(db, ulf, t.id)).toThrowError('task not found');
+		expect(() => updateTask(db, ulf, t.id, { title: 'x' })).toThrowError('task not found');
+		expect(() => deleteTask(db, ulf, t.id)).toThrowError('task not found');
+	});
+
+	it('lets the owner patch a title in their own private project (no fail-closed re-check of the existing project)', () => {
+		const { db, micha, t } = privateSetup();
+		expect(updateTask(db, micha, t.id, { title: 'geheim v2' }).title).toBe('geheim v2');
+	});
+
+	it('creating into an invisible private project fails like a missing project', () => {
+		const { db, ulf, priv } = privateSetup();
+		expect(() => createTask(db, ulf, { title: 'x', projectId: priv.id }))
+			.toThrowError('invalid projectId: project not found');
+	});
+
+	it('enforces the assignee rule in private projects (create, update, move-in)', () => {
+		const { db, micha, claude, ulf, priv } = privateSetup();
+		const err = 'tasks in a private project can only be assigned to the owner or an AI user';
+		expect(() => createTask(db, micha, { title: 'x', projectId: priv.id, assigneeId: ulf.id }))
+			.toThrowError(err);
+		expect(createTask(db, micha, { title: 'ok1', projectId: priv.id, assigneeId: micha.id }).id).toBeGreaterThan(0);
+		expect(createTask(db, micha, { title: 'ok2', projectId: priv.id, assigneeId: claude.id }).id).toBeGreaterThan(0);
+		const pub = createTask(db, micha, { title: 'wandert', assigneeId: ulf.id });
+		expect(() => updateTask(db, micha, pub.id, { projectId: priv.id })).toThrowError(err);
+	});
+
+	it('does not leak docs of foreign private projects via getTask(...).documents', () => {
+		const { db, micha, claude, ulf, priv } = privateSetup();
+		const pub = createTask(db, micha, { title: 'öffentlich' });
+		const doc = createDocument(db, micha, { title: 'Geheimdoku', projectId: priv.id });
+		linkTask(db, micha, doc.id, pub.id);
+		expect(getTask(db, ulf, pub.id).documents).toEqual([]);
+		expect(getTask(db, micha, pub.id).documents.map((d) => d.id)).toContain(doc.id);
+		expect(getTask(db, claude, pub.id).documents.map((d) => d.id)).toContain(doc.id);
 	});
 });

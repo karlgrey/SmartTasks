@@ -7,8 +7,8 @@ import { emit } from '$lib/server/events';
 
 export const GET: RequestHandler = ({ locals, url }) =>
 	run(() => {
-		requireUser(locals);
-		return json(listTasks(db, parseTaskFilters(url.searchParams)));
+		const user = requireUser(locals);
+		return json(listTasks(db, user, parseTaskFilters(url.searchParams)));
 	});
 
 export const POST: RequestHandler = ({ locals, request }) =>

@@ -8,6 +8,7 @@ import { STATUSES, PRIORITIES, SIZES, type Status, type Priority, type Size, typ
 import { parseTicketQuery } from '$lib/ticket-query';
 import { todayInBerlin } from '$lib/date-utils';
 import { listDocRefsForTask } from './documents-service';
+import { assertTaskVisible, assertProjectUsable, taskVisibilityCond } from './visibility';
 
 export type TaskFilters = {
 	assignee?: string;
@@ -62,6 +63,18 @@ function validateTypes(input: Partial<TaskInput>): void {
 	assertType('projectId', input.projectId, 'number');
 }
 
+function assertAssigneeAllowed(
+	db: Db,
+	project: { ownerId: number | null } | null,
+	assigneeId: number | null | undefined
+): void {
+	if (!project || project.ownerId === null) return;
+	if (assigneeId === null || assigneeId === undefined || assigneeId === project.ownerId) return;
+	const assignee = db.select().from(users).where(eq(users.id, assigneeId)).get();
+	if (!assignee || assignee.type !== 'ai')
+		throw new ServiceError(400, 'tasks in a private project can only be assigned to the owner or an AI user');
+}
+
 const boardOrder = [
 	sql`CASE ${tasks.priority} WHEN 'Super-High' THEN 0 WHEN 'High' THEN 1 WHEN 'Medium' THEN 2 WHEN 'Low' THEN 3 ELSE 4 END`,
 	sql`${tasks.dueDate} IS NULL`,
@@ -71,19 +84,19 @@ const boardOrder = [
 
 const doneOrder = [sql`${tasks.completedAt} IS NULL`, desc(tasks.completedAt), desc(tasks.createdAt)];
 
-export function listTasks(db: Db, filters: TaskFilters = {}): TaskDTO[] {
+export function listTasks(db: Db, user: SafeUser, filters: TaskFilters = {}): TaskDTO[] {
 	const conds: SQL[] = [];
 	if (filters.assignee !== undefined) {
 		if (/^\d+$/.test(filters.assignee)) {
 			conds.push(eq(tasks.assigneeId, Number(filters.assignee)));
 		} else {
-			const user = db
+			const assigneeUser = db
 				.select()
 				.from(users)
 				.where(sql`lower(${users.name}) = lower(${filters.assignee})`)
 				.get();
-			if (!user) return [];
-			conds.push(eq(tasks.assigneeId, user.id));
+			if (!assigneeUser) return [];
+			conds.push(eq(tasks.assigneeId, assigneeUser.id));
 		}
 	}
 	if (filters.project !== undefined) conds.push(eq(tasks.projectId, filters.project));
@@ -113,6 +126,8 @@ export function listTasks(db: Db, filters: TaskFilters = {}): TaskDTO[] {
 				: text
 		);
 	}
+	const vis = taskVisibilityCond(user);
+	if (vis) conds.push(vis);
 	return db
 		.select()
 		.from(tasks)
@@ -127,6 +142,8 @@ export function createTask(db: Db, user: SafeUser, input: TaskInput): TaskDTO {
 	validateTypes(input);
 	if (!input.title?.trim()) throw new ServiceError(400, 'title is required');
 	validateEnums(input);
+	const project = assertProjectUsable(db, user, input.projectId);
+	assertAssigneeAllowed(db, project, input.assigneeId);
 	// AI users may create tasks directly in Done: they are the creator
 	// (retroactive work documentation). Setting Done on OTHERS' tasks stays
 	// forbidden — see updateTask.
@@ -181,6 +198,7 @@ export function parseTaskFilters(params: URLSearchParams): TaskFilters {
 
 export function getTask(
 	db: Db,
+	user: SafeUser,
 	id: number
 ): TaskDTO & {
 	comments: CommentDTO[];
@@ -190,6 +208,7 @@ export function getTask(
 } {
 	const task = db.select().from(tasks).where(eq(tasks.id, id)).get();
 	if (!task) throw new ServiceError(404, 'task not found');
+	assertTaskVisible(db, user, task);
 	const taskComments = db
 		.select()
 		.from(comments)
@@ -213,7 +232,7 @@ export function getTask(
 		comments: taskComments,
 		statusEvents: events,
 		attachments: taskAttachments,
-		documents: listDocRefsForTask(db, id)
+		documents: listDocRefsForTask(db, user, id)
 	};
 }
 
@@ -230,12 +249,25 @@ export function updateTask(
 ): TaskDTO {
 	const existing = db.select().from(tasks).where(eq(tasks.id, id)).get();
 	if (!existing) throw new ServiceError(404, 'task not found');
+	// cheap payload validation first (as in createTask), so a malformed
+	// projectId reports its type error rather than a project-not-found
 	validateTypes(patch);
 	validateEnums(patch);
-	if (patch.status === 'Done' && user.type === 'ai' && existing.createdBy !== user.id)
-		throw new ServiceError(403, 'AI users can only set Done on tasks they created');
 	if (patch.title !== undefined && !patch.title.trim())
 		throw new ServiceError(400, 'title is required');
+	assertTaskVisible(db, user, existing);
+	// fail-closed only applies to a caller-supplied projectId; the task's
+	// existing project is loaded neutrally (fail-open, like assertTaskVisible)
+	// and used only for the assignee rule below
+	const project = 'projectId' in patch
+		? assertProjectUsable(db, user, patch.projectId)
+		: existing.projectId !== null
+			? (db.select().from(projects).where(eq(projects.id, existing.projectId)).get() ?? null)
+			: null;
+	const effectiveAssignee = 'assigneeId' in patch ? (patch.assigneeId ?? null) : existing.assigneeId;
+	assertAssigneeAllowed(db, project, effectiveAssignee);
+	if (patch.status === 'Done' && user.type === 'ai' && existing.createdBy !== user.id)
+		throw new ServiceError(403, 'AI users can only set Done on tasks they created');
 
 	const now = new Date().toISOString();
 	const next: Record<string, unknown> = { updatedAt: now };
@@ -259,6 +291,7 @@ export function updateTask(
 export function deleteTask(db: Db, user: SafeUser, id: number, uploadsPath = uploadsDir()): TaskDTO {
 	const existing = db.select().from(tasks).where(eq(tasks.id, id)).get();
 	if (!existing) throw new ServiceError(404, 'task not found');
+	assertTaskVisible(db, user, existing);
 	if (user.type === 'ai') throw new ServiceError(403, 'AI users cannot delete tasks');
 	// attachment rows must go before the task row (FK); file unlink is best-effort
 	deleteTaskAttachments(db, id, uploadsPath);

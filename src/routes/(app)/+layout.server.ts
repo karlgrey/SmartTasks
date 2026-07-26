@@ -9,10 +9,10 @@ export const load: LayoutServerLoad = ({ locals }) => {
 	if (!locals.user) redirect(302, '/login');
 	return {
 		user: locals.user,
-		tasks: listTasks(db, { open: true }),
-		done: listTasks(db, { status: 'Done', limit: 50 }),
+		tasks: listTasks(db, locals.user, { open: true }),
+		done: listTasks(db, locals.user, { status: 'Done', limit: 50 }),
 		users: listUsers(db),
-		projects: listProjects(db),
+		projects: listProjects(db, locals.user),
 		locations: listLocations(db)
 	};
 };

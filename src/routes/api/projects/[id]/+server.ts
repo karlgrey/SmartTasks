@@ -6,6 +6,8 @@ import { updateProject } from '$lib/server/projects-service';
 
 export const PATCH: RequestHandler = ({ locals, params, request }) =>
 	run(async () => {
-		requireUser(locals);
-		return json(updateProject(db, Number(params.id), await request.json().catch(() => ({}))));
+		const user = requireUser(locals);
+		return json(
+			updateProject(db, user, Number(params.id), await request.json().catch(() => ({})))
+		);
 	});

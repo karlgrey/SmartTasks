@@ -7,8 +7,8 @@ import { emit } from '$lib/server/events';
 
 export const GET: RequestHandler = ({ locals, params }) =>
 	run(() => {
-		requireUser(locals);
-		return json(getTask(db, Number(params.id)));
+		const user = requireUser(locals);
+		return json(getTask(db, user, Number(params.id)));
 	});
 
 export const PATCH: RequestHandler = ({ locals, params, request }) =>

@@ -6,12 +6,14 @@ import { listProjects, createProject } from '$lib/server/projects-service';
 
 export const GET: RequestHandler = ({ locals }) =>
 	run(() => {
-		requireUser(locals);
-		return json(listProjects(db));
+		const user = requireUser(locals);
+		return json(listProjects(db, user));
 	});
 
 export const POST: RequestHandler = ({ locals, request }) =>
 	run(async () => {
-		requireUser(locals);
-		return json(createProject(db, await request.json().catch(() => ({}))), { status: 201 });
+		const user = requireUser(locals);
+		return json(createProject(db, user, await request.json().catch(() => ({}))), {
+			status: 201
+		});
 	});

@@ -7,7 +7,7 @@ export const load: LayoutServerLoad = ({ locals }) => {
 	if (!locals.user) redirect(302, '/login');
 	return {
 		user: locals.user,
-		projects: listProjects(db),
+		projects: listProjects(db, locals.user),
 		users: listUsers(db)
 	};
 };

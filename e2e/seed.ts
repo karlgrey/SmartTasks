@@ -5,7 +5,8 @@ import { createProject } from '../src/lib/server/projects-service';
 
 rmSync('.e2e', { recursive: true, force: true });
 const db = createDb('.e2e/test.db');
-createUser(db, { name: 'Micha', email: 'micha@e2e.test', type: 'human', password: 'e2e-password-1' });
+const micha = createUser(db, { name: 'Micha', email: 'micha@e2e.test', type: 'human', password: 'e2e-password-1' });
+createUser(db, { name: 'Ulf', email: 'ulf@e2e.test', type: 'human', password: 'e2e-password-2' });
 createUser(db, { name: 'Claude', type: 'ai', color: '#8b5cf6' });
-createProject(db, { name: 'Website' });
+createProject(db, micha, { name: 'Website' });
 console.log('e2e db seeded');
