@@ -24,7 +24,7 @@ Task manager shared by humans and AI agents. Base URL: this host.
 | DELETE /api/tasks/:id | Delete a task incl. comments and history — human users only (403 for AI); returns \`{"ok": true}\` |
 | POST /api/tasks/:id/comments | Add comment: {body} |
 | GET /api/attachments/:id | The attachment's bytes (images inline, other types incl. PDF/docx/xlsx as a download). Upload/delete of attachments is human/web-UI only (403 for AI) |
-| GET /api/projects · POST /api/projects · PATCH /api/projects/:id | Projects: {name, color?, archived?, locationId?, wikiRef?} |
+| GET /api/projects · POST /api/projects · PATCH /api/projects/:id | Projects: {name, color?, archived?, locationId?, wikiRef?, ownerId?} |
 | GET /api/locations · POST /api/locations · PATCH /api/locations/:id | Locations: create {name}, update {name?, archived?} |
 | GET /api/users | All users (id, name, type human/ai) |
 | GET /api/events | SSE stream of task changes |
@@ -50,4 +50,14 @@ vault (\`wiki/projekte/<wikiRef>.md\`). When you work a task, read that page for
 context if a wikiRef is set. Locations are physical places; each project has at most one.
 Convention: every project gets a location — projects without a physical place (digital,
 overhead, cross-location work) use the location named \`None\`.
+
+## Private projects
+- A project with \`ownerId\` set is private: visible only to its (human) owner and to AI users.
+  Tasks, comments, attachments, linked documents and SSE events inherit this via the project.
+- Foreign private resources answer **404** (as if they did not exist), never 403.
+- Humans may only set \`ownerId\` to themselves; AI users may set any human owner.
+  Only the owner can set \`ownerId\` back to null (make it public). Owners cannot be transferred.
+- Tasks in a private project can only be assigned to the owner or an AI user.
+- Note for AI users: you can read every private project. Treat other users' private
+  tasks as confidential — never quote or reference them in team-visible output.
 `;
