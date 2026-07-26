@@ -6,8 +6,8 @@ import { getDocument, updateDocument, deleteDocument } from '$lib/server/documen
 
 export const GET: RequestHandler = ({ locals, params }) =>
 	run(() => {
-		requireUser(locals);
-		return json(getDocument(db, Number(params.id)));
+		const user = requireUser(locals);
+		return json(getDocument(db, user, Number(params.id)));
 	});
 
 export const PATCH: RequestHandler = ({ locals, params, request }) =>

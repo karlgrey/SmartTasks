@@ -14,8 +14,8 @@ import {
 
 export const GET: RequestHandler = ({ locals, params }) =>
 	run(() => {
-		requireUser(locals);
-		const attachment = getAttachment(db, Number(params.id));
+		const user = requireUser(locals);
+		const attachment = getAttachment(db, user, Number(params.id));
 		let data: Buffer;
 		try {
 			data = readFileSync(attachmentPath(attachment, uploadsDir()));

@@ -6,8 +6,8 @@ import { listDocuments, createDocument, parseDocFilters } from '$lib/server/docu
 
 export const GET: RequestHandler = ({ locals, url }) =>
 	run(() => {
-		requireUser(locals);
-		return json(listDocuments(db, parseDocFilters(url.searchParams)));
+		const user = requireUser(locals);
+		return json(listDocuments(db, user, parseDocFilters(url.searchParams)));
 	});
 
 export const POST: RequestHandler = ({ locals, request }) =>
