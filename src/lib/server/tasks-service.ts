@@ -90,13 +90,13 @@ export function listTasks(db: Db, user: SafeUser, filters: TaskFilters = {}): Ta
 		if (/^\d+$/.test(filters.assignee)) {
 			conds.push(eq(tasks.assigneeId, Number(filters.assignee)));
 		} else {
-			const user = db
+			const assigneeUser = db
 				.select()
 				.from(users)
 				.where(sql`lower(${users.name}) = lower(${filters.assignee})`)
 				.get();
-			if (!user) return [];
-			conds.push(eq(tasks.assigneeId, user.id));
+			if (!assigneeUser) return [];
+			conds.push(eq(tasks.assigneeId, assigneeUser.id));
 		}
 	}
 	if (filters.project !== undefined) conds.push(eq(tasks.projectId, filters.project));
@@ -249,17 +249,25 @@ export function updateTask(
 ): TaskDTO {
 	const existing = db.select().from(tasks).where(eq(tasks.id, id)).get();
 	if (!existing) throw new ServiceError(404, 'task not found');
-	assertTaskVisible(db, user, existing);
-	const effectiveProjectId = 'projectId' in patch ? (patch.projectId ?? null) : existing.projectId;
-	const project = assertProjectUsable(db, user, effectiveProjectId);
-	const effectiveAssignee = 'assigneeId' in patch ? (patch.assigneeId ?? null) : existing.assigneeId;
-	assertAssigneeAllowed(db, project, effectiveAssignee);
+	// cheap payload validation first (as in createTask), so a malformed
+	// projectId reports its type error rather than a project-not-found
 	validateTypes(patch);
 	validateEnums(patch);
-	if (patch.status === 'Done' && user.type === 'ai' && existing.createdBy !== user.id)
-		throw new ServiceError(403, 'AI users can only set Done on tasks they created');
 	if (patch.title !== undefined && !patch.title.trim())
 		throw new ServiceError(400, 'title is required');
+	assertTaskVisible(db, user, existing);
+	// fail-closed only applies to a caller-supplied projectId; the task's
+	// existing project is loaded neutrally (fail-open, like assertTaskVisible)
+	// and used only for the assignee rule below
+	const project = 'projectId' in patch
+		? assertProjectUsable(db, user, patch.projectId)
+		: existing.projectId !== null
+			? (db.select().from(projects).where(eq(projects.id, existing.projectId)).get() ?? null)
+			: null;
+	const effectiveAssignee = 'assigneeId' in patch ? (patch.assigneeId ?? null) : existing.assigneeId;
+	assertAssigneeAllowed(db, project, effectiveAssignee);
+	if (patch.status === 'Done' && user.type === 'ai' && existing.createdBy !== user.id)
+		throw new ServiceError(403, 'AI users can only set Done on tasks they created');
 
 	const now = new Date().toISOString();
 	const next: Record<string, unknown> = { updatedAt: now };

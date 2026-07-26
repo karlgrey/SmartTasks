@@ -161,6 +161,11 @@ export function linkTask(db: Db, user: SafeUser, documentId: number, taskId: num
 
 export function unlinkTask(db: Db, user: SafeUser, documentId: number, taskId: number): void {
 	assertDocExists(db, user, documentId);
+	// A foreign-private task must not be un-linked by someone who can't see it
+	// (linkTask checks both sides — unlink must too). A task row that no
+	// longer exists (deleteTask's cleanup path) stays a no-op delete.
+	const task = db.select().from(tasks).where(eq(tasks.id, taskId)).get();
+	if (task) assertTaskVisible(db, user, task);
 	db.delete(documentTasks)
 		.where(and(eq(documentTasks.documentId, documentId), eq(documentTasks.taskId, taskId)))
 		.run();

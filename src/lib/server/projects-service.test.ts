@@ -113,6 +113,14 @@ describe('private projects (ownerId)', () => {
 			'project has tasks assigned to other users'
 		);
 	});
+
+	it('converting a project with only AI-assigned tasks to private succeeds', () => {
+		const db = testDb();
+		const { micha, claude } = seedUsers(db);
+		const p = createProject(db, micha, { name: 'P' });
+		createTask(db, micha, { title: 'claudes task', projectId: p.id, assigneeId: claude.id });
+		expect(updateProject(db, micha, p.id, { ownerId: micha.id }).ownerId).toBe(micha.id);
+	});
 });
 
 describe('listUsers', () => {

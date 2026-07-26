@@ -250,6 +250,16 @@ describe('updateTask', () => {
 			updateTask(db, micha, t.id, { hours: 'abc' })
 		).toThrowError('invalid hours: must be a number');
 	});
+
+	it('validates projectId type before resolving it as a project (order matches createTask)', () => {
+		const db = testDb();
+		const { micha } = seedUsers(db);
+		const t = createTask(db, micha, { title: 'x' });
+		expect(() =>
+			// @ts-expect-error invalid type on purpose
+			updateTask(db, micha, t.id, { projectId: 'abc' })
+		).toThrowError('invalid projectId: must be a number');
+	});
 });
 
 describe('status events', () => {
@@ -335,7 +345,7 @@ describe('private projects — task visibility', () => {
 		const { micha, claude } = seedUsers(db);
 		const ulf = createUser(db, { name: 'Ulf', type: 'human' });
 		const priv = createProject(db, micha, { name: 'Privat', ownerId: micha.id });
-		const t = createTask(db, micha, { title: 'geheim', projectId: priv.id });
+		const t = createTask(db, micha, { title: 'geheim', projectId: priv.id, dueDate: '2020-01-01' });
 		return { db, micha, claude, ulf, priv, t };
 	}
 
@@ -345,6 +355,8 @@ describe('private projects — task visibility', () => {
 		expect(listTasks(db, ulf)).toHaveLength(0);
 		expect(listTasks(db, ulf, { q: 'geheim' })).toHaveLength(0);
 		expect(listTasks(db, claude).map((t) => t.title)).toContain('geheim');
+		expect(listTasks(db, ulf, { today: true })).toHaveLength(0);
+		expect(listTasks(db, micha, { today: true }).length).toBeGreaterThan(0);
 	});
 
 	it('getTask/updateTask/deleteTask answer 404 for non-owners', () => {
@@ -352,6 +364,11 @@ describe('private projects — task visibility', () => {
 		expect(() => getTask(db, ulf, t.id)).toThrowError('task not found');
 		expect(() => updateTask(db, ulf, t.id, { title: 'x' })).toThrowError('task not found');
 		expect(() => deleteTask(db, ulf, t.id)).toThrowError('task not found');
+	});
+
+	it('lets the owner patch a title in their own private project (no fail-closed re-check of the existing project)', () => {
+		const { db, micha, t } = privateSetup();
+		expect(updateTask(db, micha, t.id, { title: 'geheim v2' }).title).toBe('geheim v2');
 	});
 
 	it('creating into an invisible private project fails like a missing project', () => {

@@ -159,4 +159,23 @@ describe('private projects', () => {
 		expect(getDocument(db, ulf, doc.id).tasks).toHaveLength(0);
 		expect(getDocument(db, micha, doc.id).tasks.map((r) => r.id)).toContain(t.id);
 	});
+
+	it('unlinkTask 404s when the task is foreign-private (link stays); owner and AI can still unlink', () => {
+		const { db, micha, claude, ulf, priv } = privateSetup();
+		const publicDoc = createDocument(db, micha, { title: 'Öffentliches Doc' });
+		const privateTask = createTask(db, micha, { title: 'geheim2', projectId: priv.id });
+		linkTask(db, micha, publicDoc.id, privateTask.id);
+
+		expect(() => unlinkTask(db, ulf, publicDoc.id, privateTask.id)).toThrowError('task not found');
+		expect(getDocument(db, micha, publicDoc.id).tasks.map((r) => r.id)).toContain(privateTask.id);
+
+		// AI can unlink
+		unlinkTask(db, claude, publicDoc.id, privateTask.id);
+		expect(getDocument(db, micha, publicDoc.id).tasks.map((r) => r.id)).not.toContain(privateTask.id);
+
+		// owner can unlink too
+		linkTask(db, micha, publicDoc.id, privateTask.id);
+		unlinkTask(db, micha, publicDoc.id, privateTask.id);
+		expect(getDocument(db, micha, publicDoc.id).tasks.map((r) => r.id)).not.toContain(privateTask.id);
+	});
 });

@@ -4,8 +4,10 @@
 
 	let { data } = $props();
 
-	const projectName = (id: number | null) =>
-		data.projects.find((p) => p.id === id)?.name ?? null;
+	const projectName = (id: number | null) => {
+		const p = data.projects.find((p) => p.id === id);
+		return p ? `${p.ownerId != null ? '🔒 ' : ''}${p.name}` : null;
+	};
 	const fmtDate = (iso: string) => iso.slice(0, 10);
 
 	function setParam(key: string, value: string | null) {
@@ -29,7 +31,7 @@
 	>
 		<option value="">All projects</option>
 		{#each data.projects.filter((p) => !p.archived) as p (p.id)}
-			<option value={p.id} selected={data.project === p.id}>{p.name}</option>
+			<option value={p.id} selected={data.project === p.id}>{p.ownerId != null ? `🔒 ${p.name}` : p.name}</option>
 		{/each}
 	</select>
 	<input
