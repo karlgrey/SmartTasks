@@ -4,6 +4,7 @@ import { tasks, comments } from './db/schema';
 import { ServiceError } from './errors';
 import type { SafeUser } from './auth';
 import type { CommentDTO, TaskDTO } from '$lib/types';
+import { assertTaskVisible } from './visibility';
 
 export function addComment(
 	db: Db,
@@ -14,6 +15,7 @@ export function addComment(
 	if (typeof body !== 'string' || !body.trim()) throw new ServiceError(400, 'body is required');
 	const existing = db.select().from(tasks).where(eq(tasks.id, taskId)).get();
 	if (!existing) throw new ServiceError(404, 'task not found');
+	assertTaskVisible(db, user, existing);
 	const now = new Date().toISOString();
 	const comment = db
 		.insert(comments)

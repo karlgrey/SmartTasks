@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { testDb, seedUsers } from './test-utils';
 import { createProject } from './projects-service';
 import { createTask, deleteTask } from './tasks-service';
+import { createUser } from './auth';
 import {
 	listDocuments,
 	createDocument,
@@ -56,7 +57,7 @@ describe('documents-service', () => {
 		const d = createDocument(db, users.micha, { title: 'A' });
 		expect(() => updateDocument(db, users.micha, d.id, { title: ' ' })).toThrowError(/title is required/);
 		expect(() => updateDocument(db, users.micha, 999, { title: 'x' })).toThrowError(/not found/);
-		expect(() => getDocument(db, 999)).toThrowError(/not found/);
+		expect(() => getDocument(db, users.micha, 999)).toThrowError(/not found/);
 	});
 
 	it('delete is human-only (AI → 403) and cleans up link rows', () => {
@@ -65,7 +66,7 @@ describe('documents-service', () => {
 		linkTask(db, users.micha, d.id, task.id);
 		expect(() => deleteDocument(db, users.claude, d.id)).toThrowError(/AI users/);
 		deleteDocument(db, users.micha, d.id);
-		expect(() => getDocument(db, d.id)).toThrowError(/not found/);
+		expect(() => getDocument(db, users.micha, d.id)).toThrowError(/not found/);
 		// link row gone → task shows no docs
 		expect(listDocRefsForTask(db, task.id)).toEqual([]);
 	});
@@ -77,18 +78,18 @@ describe('documents-service', () => {
 		const b = createDocument(db, users.micha, { title: 'Beta', body: 'mentions kanban here' });
 
 		// newest-updated first
-		const all = listDocuments(db, {});
+		const all = listDocuments(db, users.micha, {});
 		expect(all.map((d) => d.id)).toEqual([b.id, a.id]);
 
 		// project filter
-		expect(listDocuments(db, { project: p1.id }).map((d) => d.id)).toEqual([a.id]);
+		expect(listDocuments(db, users.micha, { project: p1.id }).map((d) => d.id)).toEqual([a.id]);
 
 		// search matches title
-		expect(listDocuments(db, { q: 'alpha' }).map((d) => d.id)).toEqual([a.id]);
+		expect(listDocuments(db, users.micha, { q: 'alpha' }).map((d) => d.id)).toEqual([a.id]);
 		// search matches body
-		expect(listDocuments(db, { q: 'kanban' }).map((d) => d.id)).toEqual([b.id]);
+		expect(listDocuments(db, users.micha, { q: 'kanban' }).map((d) => d.id)).toEqual([b.id]);
 		// no match
-		expect(listDocuments(db, { q: 'zzz' })).toEqual([]);
+		expect(listDocuments(db, users.micha, { q: 'zzz' })).toEqual([]);
 	});
 
 	it('links tasks idempotently and exposes both directions', () => {
@@ -100,14 +101,14 @@ describe('documents-service', () => {
 		linkTask(db, users.micha, d.id, t1.id); // idempotent, no throw / no dup
 		linkTask(db, users.claude, d.id, t2.id); // AI may link
 
-		const detail = getDocument(db, d.id);
+		const detail = getDocument(db, users.micha, d.id);
 		expect(detail.tasks.map((t) => t.id).sort()).toEqual([t1.id, t2.id].sort());
 		expect(detail.tasks[0]).toHaveProperty('status');
 
 		expect(listDocRefsForTask(db, t1.id)).toEqual([{ id: d.id, title: 'A' }]);
 
 		unlinkTask(db, users.micha, d.id, t1.id);
-		expect(getDocument(db, d.id).tasks.map((t) => t.id)).toEqual([t2.id]);
+		expect(getDocument(db, users.micha, d.id).tasks.map((t) => t.id)).toEqual([t2.id]);
 	});
 
 	it('link/unlink validate that both entities exist', () => {
@@ -122,12 +123,40 @@ describe('documents-service', () => {
 		const d = createDocument(db, users.micha, { title: 'A' });
 		linkTask(db, users.micha, d.id, task.id);
 		expect(() => deleteTask(db, users.micha, task.id)).not.toThrow();
-		expect(getDocument(db, d.id).tasks).toEqual([]);
+		expect(getDocument(db, users.micha, d.id).tasks).toEqual([]);
 	});
 
 	it('parseDocFilters reads project, q, limit, offset', () => {
 		const f = parseDocFilters(new URLSearchParams('project=3&q=hello&limit=10&offset=5'));
 		expect(f).toEqual({ project: 3, q: 'hello', limit: 10, offset: 5 });
 		expect(parseDocFilters(new URLSearchParams(''))).toEqual({});
+	});
+});
+
+describe('private projects', () => {
+	function privateSetup() {
+		const db = testDb();
+		const { micha, claude } = seedUsers(db);
+		const ulf = createUser(db, { name: 'Ulf', type: 'human' });
+		const priv = createProject(db, micha, { name: 'Privat', ownerId: micha.id });
+		const t = createTask(db, micha, { title: 'geheim', projectId: priv.id });
+		return { db, micha, claude, ulf, priv, t };
+	}
+
+	it('hides docs of foreign private projects in list, search and detail', () => {
+		const { db, micha, ulf, priv } = privateSetup();
+		const doc = createDocument(db, micha, { title: 'Geheimplan', projectId: priv.id });
+		expect(listDocuments(db, ulf).map((d) => d.id)).not.toContain(doc.id);
+		expect(listDocuments(db, ulf, { q: 'Geheim' })).toHaveLength(0);
+		expect(() => getDocument(db, ulf, doc.id)).toThrowError('document not found');
+		expect(getDocument(db, micha, doc.id).id).toBe(doc.id);
+	});
+
+	it('does not leak private task titles via taskRefs of a public document', () => {
+		const { db, micha, ulf, t } = privateSetup();
+		const doc = createDocument(db, micha, { title: 'Öffentlich' });
+		linkTask(db, micha, doc.id, t.id);
+		expect(getDocument(db, ulf, doc.id).tasks).toHaveLength(0);
+		expect(getDocument(db, micha, doc.id).tasks.map((r) => r.id)).toContain(t.id);
 	});
 });

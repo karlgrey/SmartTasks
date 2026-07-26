@@ -6,6 +6,7 @@ import { tasks, attachments } from './db/schema';
 import { ServiceError } from './errors';
 import type { SafeUser } from './auth';
 import type { AttachmentDTO } from '$lib/types';
+import { assertTaskVisible } from './visibility';
 
 const MAX_SIZE = 5 * 1024 * 1024;
 
@@ -70,8 +71,9 @@ export function addAttachment(
 		throw new ServiceError(400, `file extension does not match type ${file.mime}`);
 	if (file.data.length === 0) throw new ServiceError(400, 'file is empty');
 	if (file.data.length > MAX_SIZE) throw new ServiceError(400, 'file too large (max 5 MB)');
-	if (!db.select().from(tasks).where(eq(tasks.id, taskId)).get())
-		throw new ServiceError(404, 'task not found');
+	const task = db.select().from(tasks).where(eq(tasks.id, taskId)).get();
+	if (!task) throw new ServiceError(404, 'task not found');
+	assertTaskVisible(db, user, task);
 	const row = db
 		.insert(attachments)
 		.values({
@@ -94,15 +96,23 @@ export function addAttachment(
 	return row;
 }
 
-export function getAttachment(db: Db, id: number): AttachmentDTO {
+export function getAttachment(db: Db, user: SafeUser, id: number): AttachmentDTO {
 	const row = db.select().from(attachments).where(eq(attachments.id, id)).get();
 	if (!row) throw new ServiceError(404, 'attachment not found');
+	const task = db.select().from(tasks).where(eq(tasks.id, row.taskId)).get();
+	if (task) {
+		try {
+			assertTaskVisible(db, user, task);
+		} catch {
+			throw new ServiceError(404, 'attachment not found');
+		}
+	}
 	return row;
 }
 
 export function deleteAttachment(db: Db, user: SafeUser, id: number, dir: string): AttachmentDTO {
 	if (user.type === 'ai') throw new ServiceError(403, 'AI users cannot delete attachments');
-	const row = getAttachment(db, id);
+	const row = getAttachment(db, user, id);
 	db.delete(attachments).where(eq(attachments.id, id)).run();
 	rmSync(attachmentPath(row, dir), { force: true });
 	return row;
