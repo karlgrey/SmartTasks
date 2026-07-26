@@ -11,6 +11,7 @@ import { mkdtempSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { addAttachment, attachmentPath } from './attachments-service';
+import { createDocument, linkTask } from './documents-service';
 
 describe('createTask', () => {
 	it('creates with defaults and rejects empty titles and bad enums', () => {
@@ -368,5 +369,15 @@ describe('private projects — task visibility', () => {
 		expect(createTask(db, micha, { title: 'ok2', projectId: priv.id, assigneeId: claude.id }).id).toBeGreaterThan(0);
 		const pub = createTask(db, micha, { title: 'wandert', assigneeId: ulf.id });
 		expect(() => updateTask(db, micha, pub.id, { projectId: priv.id })).toThrowError(err);
+	});
+
+	it('does not leak docs of foreign private projects via getTask(...).documents', () => {
+		const { db, micha, claude, ulf, priv } = privateSetup();
+		const pub = createTask(db, micha, { title: 'öffentlich' });
+		const doc = createDocument(db, micha, { title: 'Geheimdoku', projectId: priv.id });
+		linkTask(db, micha, doc.id, pub.id);
+		expect(getTask(db, ulf, pub.id).documents).toEqual([]);
+		expect(getTask(db, micha, pub.id).documents.map((d) => d.id)).toContain(doc.id);
+		expect(getTask(db, claude, pub.id).documents.map((d) => d.id)).toContain(doc.id);
 	});
 });

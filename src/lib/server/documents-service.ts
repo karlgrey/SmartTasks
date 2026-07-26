@@ -166,12 +166,15 @@ export function unlinkTask(db: Db, user: SafeUser, documentId: number, taskId: n
 		.run();
 }
 
-export function listDocRefsForTask(db: Db, taskId: number): DocRefDTO[] {
+export function listDocRefsForTask(db: Db, user: SafeUser, taskId: number): DocRefDTO[] {
+	const conds: SQL[] = [eq(documentTasks.taskId, taskId)];
+	const vis = documentVisibilityCond(user);
+	if (vis) conds.push(vis);
 	return db
 		.select({ id: documents.id, title: documents.title })
 		.from(documentTasks)
 		.innerJoin(documents, eq(documents.id, documentTasks.documentId))
-		.where(eq(documentTasks.taskId, taskId))
+		.where(and(...conds))
 		.orderBy(asc(documents.title))
 		.all();
 }

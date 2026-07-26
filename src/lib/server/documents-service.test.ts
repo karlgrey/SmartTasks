@@ -68,7 +68,7 @@ describe('documents-service', () => {
 		deleteDocument(db, users.micha, d.id);
 		expect(() => getDocument(db, users.micha, d.id)).toThrowError(/not found/);
 		// link row gone → task shows no docs
-		expect(listDocRefsForTask(db, task.id)).toEqual([]);
+		expect(listDocRefsForTask(db, users.micha, task.id)).toEqual([]);
 	});
 
 	it('lists newest-updated first, filters by project, searches title AND body', async () => {
@@ -105,7 +105,7 @@ describe('documents-service', () => {
 		expect(detail.tasks.map((t) => t.id).sort()).toEqual([t1.id, t2.id].sort());
 		expect(detail.tasks[0]).toHaveProperty('status');
 
-		expect(listDocRefsForTask(db, t1.id)).toEqual([{ id: d.id, title: 'A' }]);
+		expect(listDocRefsForTask(db, users.micha, t1.id)).toEqual([{ id: d.id, title: 'A' }]);
 
 		unlinkTask(db, users.micha, d.id, t1.id);
 		expect(getDocument(db, users.micha, d.id).tasks.map((t) => t.id)).toEqual([t2.id]);

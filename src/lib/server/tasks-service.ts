@@ -232,7 +232,7 @@ export function getTask(
 		comments: taskComments,
 		statusEvents: events,
 		attachments: taskAttachments,
-		documents: listDocRefsForTask(db, id)
+		documents: listDocRefsForTask(db, user, id)
 	};
 }
 
