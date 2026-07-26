@@ -12,7 +12,7 @@ describe('addComment', () => {
 		expect(comment.authorId).toBe(claude.id);
 		expect(comment.body).toBe('Result: done, see attachment.');
 		expect(task.updatedAt >= t.updatedAt).toBe(true);
-		expect(getTask(db, t.id).comments).toHaveLength(1);
+		expect(getTask(db, micha, t.id).comments).toHaveLength(1);
 	});
 
 	it('rejects empty bodies and missing tasks', () => {
