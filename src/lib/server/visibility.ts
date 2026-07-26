@@ -35,6 +35,17 @@ export function assertTaskVisible(
 	if (project && !canSeeProject(user, project)) throw new ServiceError(404, 'task not found');
 }
 
+// SSE stream filtering: a foreign private project's events must not leak over the wire.
+export function canSeeEvent(
+	db: Db,
+	user: SafeUser,
+	e: { task: { projectId: number | null } }
+): boolean {
+	if (user.type === 'ai' || e.task.projectId === null) return true;
+	const project = db.select().from(projects).where(eq(projects.id, e.task.projectId)).get();
+	return !project || canSeeProject(user, project);
+}
+
 // For writes that reference a projectId: missing and foreign-private look identical (400).
 export function assertProjectUsable(
 	db: Db,

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
 	canSeeProject, taskVisibilityCond, projectVisibilityCond,
-	assertTaskVisible, assertProjectUsable
+	assertTaskVisible, assertProjectUsable, canSeeEvent
 } from './visibility';
 import { testDb, seedUsers } from './test-utils';
 import { createUser } from './auth';
@@ -50,5 +50,19 @@ describe('assertTaskVisible / assertProjectUsable', () => {
 		expect(() => assertProjectUsable(db, micha, foreign.id)).toThrowError('invalid projectId: project not found');
 		expect(() => assertProjectUsable(db, micha, 999999)).toThrowError('invalid projectId: project not found');
 		expect(assertProjectUsable(db, claude, foreign.id)?.id).toBe(foreign.id);
+	});
+});
+
+describe('canSeeEvent', () => {
+	it('drops events of foreign private projects for humans, passes for owner and AI', () => {
+		const db = testDb();
+		const { micha, claude } = seedUsers(db);
+		const ulf = createUser(db, { name: 'Ulf', type: 'human' });
+		const priv = db.insert(projects).values({ name: 'P', ownerId: micha.id }).returning().get();
+		const e = { task: { projectId: priv.id } };
+		expect(canSeeEvent(db, micha, e)).toBe(true);
+		expect(canSeeEvent(db, ulf, e)).toBe(false);
+		expect(canSeeEvent(db, claude, e)).toBe(true);
+		expect(canSeeEvent(db, ulf, { task: { projectId: null } })).toBe(true);
 	});
 });

@@ -1,10 +1,12 @@
 import type { RequestHandler } from './$types';
 import { run, requireUser } from '$lib/server/api-utils';
 import { subscribe } from '$lib/server/events';
+import { db } from '$lib/server/db';
+import { canSeeEvent } from '$lib/server/visibility';
 
 export const GET: RequestHandler = ({ locals }) =>
 	run(() => {
-		requireUser(locals);
+		const user = requireUser(locals);
 		let unsubscribe: () => void = () => {};
 		let ping: ReturnType<typeof setInterval> | undefined;
 		let closed = false;
@@ -26,7 +28,10 @@ export const GET: RequestHandler = ({ locals }) =>
 				};
 				send(': connected\n\n');
 				if (closed) return;
-				unsubscribe = subscribe((e) => send(`data: ${JSON.stringify(e)}\n\n`));
+				unsubscribe = subscribe((e) => {
+					if (!canSeeEvent(db, user, e)) return;
+					send(`data: ${JSON.stringify(e)}\n\n`);
+				});
 				ping = setInterval(() => send(': ping\n\n'), 25000);
 			},
 			cancel() {
