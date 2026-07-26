@@ -137,4 +137,16 @@ describe('private projects', () => {
 		expect(getAttachment(db, micha, a.id).id).toBe(a.id);
 		rmSync(dir, { recursive: true, force: true });
 	});
+
+	it('rejects uploads to tasks in foreign private projects with 404', () => {
+		const { db, micha, ulf, t } = privateSetup();
+		const dir = mkdtempSync(join(tmpdir(), 'att-'));
+		const f = { filename: 'x.png', mime: 'image/png', data: Buffer.from('x') };
+		// claude (AI) is excluded here: AI users can't upload attachments at all
+		// (403, "AI users cannot upload attachments"), independent of visibility —
+		// covered by the existing "rejects AI users" test above.
+		expect(() => addAttachment(db, ulf, t.id, f, dir)).toThrowError('task not found');
+		expect(addAttachment(db, micha, t.id, f, dir).taskId).toBe(t.id);
+		rmSync(dir, { recursive: true, force: true });
+	});
 });
