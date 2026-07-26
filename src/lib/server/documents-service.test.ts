@@ -41,7 +41,7 @@ describe('documents-service', () => {
 	});
 
 	it('updates title/body/projectId and bumps updatedAt', async () => {
-		const project = createProject(db, { name: 'Website' });
+		const project = createProject(db, users.micha, { name: 'Website' });
 		const d = createDocument(db, users.micha, { title: 'A' });
 		await new Promise((r) => setTimeout(r, 5));
 		const upd = updateDocument(db, users.micha, d.id, { title: 'B', projectId: project.id });
@@ -71,7 +71,7 @@ describe('documents-service', () => {
 	});
 
 	it('lists newest-updated first, filters by project, searches title AND body', async () => {
-		const p1 = createProject(db, { name: 'P1' });
+		const p1 = createProject(db, users.micha, { name: 'P1' });
 		const a = createDocument(db, users.micha, { title: 'Alpha guide', body: 'nothing', projectId: p1.id });
 		await new Promise((r) => setTimeout(r, 5));
 		const b = createDocument(db, users.micha, { title: 'Beta', body: 'mentions kanban here' });

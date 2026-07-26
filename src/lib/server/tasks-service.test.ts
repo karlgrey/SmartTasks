@@ -119,8 +119,8 @@ describe('listTasks', () => {
 		const db = testDb();
 		const { micha } = seedUsers(db);
 		const schiff = createLocation(db, { name: 'Schiffmühle' });
-		const teich = createProject(db, { name: 'Teichbau', locationId: schiff.id });
-		const other = createProject(db, { name: 'Elsewhere' });
+		const teich = createProject(db, micha, { name: 'Teichbau', locationId: schiff.id });
+		const other = createProject(db, micha, { name: 'Elsewhere' });
 		createTask(db, micha, { title: 'Teich ausheben', projectId: teich.id });
 		createTask(db, micha, { title: 'Other work', projectId: other.id });
 		createTask(db, micha, { title: 'No project' });
