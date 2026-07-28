@@ -1,10 +1,10 @@
 import { and, eq, or, like, asc, desc, type SQL } from 'drizzle-orm';
 import type { Db } from './db';
-import { documents, documentTasks, tasks, projects } from './db/schema';
+import { documents, documentTasks, tasks } from './db/schema';
 import { ServiceError } from './errors';
 import type { SafeUser } from './auth';
 import type { DocumentDTO, TaskRefDTO, DocRefDTO } from '$lib/types';
-import { assertProjectUsable, assertTaskVisible, canSeeProject, documentVisibilityCond, taskVisibilityCond } from './visibility';
+import { assertProjectUsable, assertTaskVisible, assertVisibleByProject, documentVisibilityCond, taskVisibilityCond } from './visibility';
 
 export type DocFilters = {
 	project?: number;
@@ -90,9 +90,7 @@ function taskRefs(db: Db, user: SafeUser, documentId: number): TaskRefDTO[] {
 }
 
 function assertDocVisible(db: Db, user: SafeUser, doc: { projectId: number | null }): void {
-	if (doc.projectId === null) return;
-	const project = db.select().from(projects).where(eq(projects.id, doc.projectId)).get();
-	if (project && !canSeeProject(user, project)) throw new ServiceError(404, 'document not found');
+	assertVisibleByProject(db, user, doc.projectId, 'document not found');
 }
 
 export function getDocument(

@@ -25,14 +25,26 @@ export function documentVisibilityCond(user: SafeUser): SQL | undefined {
 }
 
 // 404 (not 403): foreign private resources must not reveal their existence.
+// Shared by all entities that hang off a project (tasks, documents,
+// attachments via their task) — a missing project is treated as visible
+// (fail-open), same as a null projectId; only a foreign-private project 404s.
+export function assertVisibleByProject(
+	db: Db,
+	user: SafeUser,
+	projectId: number | null,
+	notFoundMessage: string
+): void {
+	if (user.type === 'ai' || projectId === null) return;
+	const project = db.select().from(projects).where(eq(projects.id, projectId)).get();
+	if (project && !canSeeProject(user, project)) throw new ServiceError(404, notFoundMessage);
+}
+
 export function assertTaskVisible(
 	db: Db,
 	user: SafeUser,
 	task: { projectId: number | null }
 ): void {
-	if (user.type === 'ai' || task.projectId === null) return;
-	const project = db.select().from(projects).where(eq(projects.id, task.projectId)).get();
-	if (project && !canSeeProject(user, project)) throw new ServiceError(404, 'task not found');
+	assertVisibleByProject(db, user, task.projectId, 'task not found');
 }
 
 // SSE stream filtering: a foreign private project's events must not leak over the wire.
@@ -41,9 +53,12 @@ export function canSeeEvent(
 	user: SafeUser,
 	e: { task: { projectId: number | null } }
 ): boolean {
-	if (user.type === 'ai' || e.task.projectId === null) return true;
-	const project = db.select().from(projects).where(eq(projects.id, e.task.projectId)).get();
-	return !project || canSeeProject(user, project);
+	try {
+		assertVisibleByProject(db, user, e.task.projectId, 'event not visible');
+		return true;
+	} catch {
+		return false;
+	}
 }
 
 // For writes that reference a projectId: missing and foreign-private look identical (400).

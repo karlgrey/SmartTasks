@@ -371,6 +371,14 @@ describe('private projects — task visibility', () => {
 		expect(updateTask(db, micha, t.id, { title: 'geheim v2' }).title).toBe('geheim v2');
 	});
 
+	it('answers 404, not 400, for a malformed patch on a foreign private task (visibility before payload validation)', () => {
+		const { db, ulf, t } = privateSetup();
+		expect(() =>
+			// @ts-expect-error invalid type on purpose
+			updateTask(db, ulf, t.id, { hours: 'abc' })
+		).toThrowError('task not found');
+	});
+
 	it('creating into an invisible private project fails like a missing project', () => {
 		const { db, ulf, priv } = privateSetup();
 		expect(() => createTask(db, ulf, { title: 'x', projectId: priv.id }))

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
 	canSeeProject, taskVisibilityCond, projectVisibilityCond,
-	assertTaskVisible, assertProjectUsable, canSeeEvent
+	assertTaskVisible, assertProjectUsable, canSeeEvent, assertVisibleByProject
 } from './visibility';
 import { testDb, seedUsers } from './test-utils';
 import { createUser } from './auth';
@@ -50,6 +50,21 @@ describe('assertTaskVisible / assertProjectUsable', () => {
 		expect(() => assertProjectUsable(db, micha, foreign.id)).toThrowError('invalid projectId: project not found');
 		expect(() => assertProjectUsable(db, micha, 999999)).toThrowError('invalid projectId: project not found');
 		expect(assertProjectUsable(db, claude, foreign.id)?.id).toBe(foreign.id);
+	});
+});
+
+describe('assertVisibleByProject', () => {
+	it('is the shared lookup behind assertTaskVisible/canSeeEvent/assertDocVisible/getAttachment: 404s a foreign private project, passes own/public/null/missing', () => {
+		const db = testDb();
+		const { micha, claude } = seedUsers(db);
+		const other = createUser(db, { name: 'Other3', type: 'human' });
+		const own = db.insert(projects).values({ name: 'Mine2', ownerId: micha.id }).returning().get();
+		const foreign = db.insert(projects).values({ name: 'F2', ownerId: other.id }).returning().get();
+		expect(() => assertVisibleByProject(db, micha, null, 'x not found')).not.toThrow();
+		expect(() => assertVisibleByProject(db, micha, own.id, 'x not found')).not.toThrow();
+		expect(() => assertVisibleByProject(db, micha, 999999, 'x not found')).not.toThrow(); // missing project: fail-open
+		expect(() => assertVisibleByProject(db, micha, foreign.id, 'x not found')).toThrowError('x not found');
+		expect(() => assertVisibleByProject(db, claude, foreign.id, 'x not found')).not.toThrow(); // AI sees all
 	});
 });
 

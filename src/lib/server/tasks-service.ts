@@ -249,13 +249,13 @@ export function updateTask(
 ): TaskDTO {
 	const existing = db.select().from(tasks).where(eq(tasks.id, id)).get();
 	if (!existing) throw new ServiceError(404, 'task not found');
-	// cheap payload validation first (as in createTask), so a malformed
-	// projectId reports its type error rather than a project-not-found
+	// visibility before payload validation: a foreign-private task must 404
+	// even for a malformed patch, or its existence leaks via a 400 instead
+	assertTaskVisible(db, user, existing);
 	validateTypes(patch);
 	validateEnums(patch);
 	if (patch.title !== undefined && !patch.title.trim())
 		throw new ServiceError(400, 'title is required');
-	assertTaskVisible(db, user, existing);
 	// fail-closed only applies to a caller-supplied projectId; the task's
 	// existing project is loaded neutrally (fail-open, like assertTaskVisible)
 	// and used only for the assignee rule below

@@ -2,11 +2,11 @@ import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { eq } from 'drizzle-orm';
 import type { Db } from './db';
-import { tasks, attachments, projects } from './db/schema';
+import { tasks, attachments } from './db/schema';
 import { ServiceError } from './errors';
 import type { SafeUser } from './auth';
 import type { AttachmentDTO } from '$lib/types';
-import { assertTaskVisible, canSeeProject } from './visibility';
+import { assertTaskVisible, assertVisibleByProject } from './visibility';
 
 const MAX_SIZE = 5 * 1024 * 1024;
 
@@ -100,10 +100,7 @@ export function getAttachment(db: Db, user: SafeUser, id: number): AttachmentDTO
 	const row = db.select().from(attachments).where(eq(attachments.id, id)).get();
 	if (!row) throw new ServiceError(404, 'attachment not found');
 	const task = db.select().from(tasks).where(eq(tasks.id, row.taskId)).get();
-	if (task && task.projectId !== null && user.type !== 'ai') {
-		const project = db.select().from(projects).where(eq(projects.id, task.projectId)).get();
-		if (project && !canSeeProject(user, project)) throw new ServiceError(404, 'attachment not found');
-	}
+	if (task) assertVisibleByProject(db, user, task.projectId, 'attachment not found');
 	return row;
 }
 
