@@ -79,5 +79,9 @@
 			width: 100%;
 			min-width: 0;
 		}
+		/* #257: Spalten-Header mobil einen Punkt größer (Micha, 30.07.2026) */
+		header {
+			font-size: 14px;
+		}
 	}
 </style>
