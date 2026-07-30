@@ -65,3 +65,16 @@ textarea {
 [data-user-id="5"] {
 	display: none;
 }
+
+/* iOS-Auto-Zoom-Fix (Task #257): Safari/iOS zoomt beim Fokussieren von
+   Eingabefeldern mit font-size < 16px dauerhaft in die Seite (Beschreibung
+   bearbeiten -> View bleibt ~10% zu groß). Deshalb bekommen ALLE
+   Formularfelder auf Mobilgeräten mindestens 16px - das unterdrückt den
+   Zoom, ohne (wie maximum-scale=1) das bewusste Nutzer-Zoomen zu verbieten. */
+@media (max-width: 767px) {
+	input,
+	textarea,
+	select {
+		font-size: 16px;
+	}
+}
