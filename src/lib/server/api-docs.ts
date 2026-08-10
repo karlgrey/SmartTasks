@@ -28,10 +28,10 @@ Task manager shared by humans and AI agents. Base URL: this host.
 | GET /api/locations · POST /api/locations · PATCH /api/locations/:id | Locations: create {name}, update {name?, archived?} |
 | GET /api/users | All users (id, name, type human/ai) |
 | GET /api/events | SSE stream of task changes |
-| GET /api/documents | List docs. Query: project (id), q (LIKE over title+body), limit, offset; newest-updated first |
+| GET /api/documents | List docs. Query: project (id), q (LIKE over title+body), limit, offset; pinned docs first, then newest-updated first |
 | POST /api/documents | Create a doc: {title, body?, projectId?} (Markdown body) |
 | GET /api/documents/:id | Doc detail incl. \`tasks\` (linked tasks: id, title, status) |
-| PATCH /api/documents/:id | Partial update: {title?, body?, projectId?} |
+| PATCH /api/documents/:id | Partial update: {title?, body?, projectId?, pinned?} — pinning is open to humans and AI alike |
 | DELETE /api/documents/:id | Delete a doc incl. its task links — human users only (403 for AI) |
 | POST /api/documents/:id/tasks | Link a task to the doc: {taskId} (idempotent) |
 | DELETE /api/documents/:id/tasks/:taskId | Unlink a task from the doc |
