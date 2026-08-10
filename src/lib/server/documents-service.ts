@@ -17,11 +17,17 @@ export type DocumentInput = {
 	title: string;
 	body?: string;
 	projectId?: number | null;
+	pinned?: boolean;
 };
 
 function assertBody(value: unknown): void {
 	if (value !== null && value !== undefined && typeof value !== 'string')
 		throw new ServiceError(400, 'invalid body: must be a string');
+}
+
+function assertPinned(value: unknown): void {
+	if (value !== undefined && typeof value !== 'boolean')
+		throw new ServiceError(400, 'invalid pinned: must be a boolean');
 }
 
 export function parseDocFilters(params: URLSearchParams): DocFilters {
@@ -50,7 +56,7 @@ export function listDocuments(db: Db, user: SafeUser, filters: DocFilters = {}):
 		.select()
 		.from(documents)
 		.where(conds.length ? and(...conds) : undefined)
-		.orderBy(desc(documents.updatedAt), desc(documents.id))
+		.orderBy(desc(documents.pinned), desc(documents.updatedAt), desc(documents.id))
 		.limit(filters.limit ?? -1)
 		.offset(filters.offset ?? 0)
 		.all();
@@ -104,7 +110,7 @@ export function getDocument(
 	return { ...doc, tasks: taskRefs(db, user, id) };
 }
 
-const UPDATABLE = ['title', 'body', 'projectId'] as const;
+const UPDATABLE = ['title', 'body', 'projectId', 'pinned'] as const;
 
 export function updateDocument(
 	db: Db,
@@ -118,6 +124,7 @@ export function updateDocument(
 	if (patch.title !== undefined && (typeof patch.title !== 'string' || !patch.title.trim()))
 		throw new ServiceError(400, 'title is required');
 	assertBody(patch.body);
+	assertPinned(patch.pinned);
 	if ('projectId' in patch) assertProjectUsable(db, user, patch.projectId);
 
 	const next: Record<string, unknown> = { updatedAt: new Date().toISOString() };

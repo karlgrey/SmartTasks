@@ -87,6 +87,7 @@ export const documents = sqliteTable('documents', {
 	title: text('title').notNull(),
 	body: text('body').notNull().default(''),
 	projectId: integer('project_id').references(() => projects.id),
+	pinned: integer('pinned', { mode: 'boolean' }).notNull().default(false),
 	createdBy: integer('created_by')
 		.notNull()
 		.references(() => users.id),

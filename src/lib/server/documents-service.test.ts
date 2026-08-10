@@ -29,6 +29,7 @@ describe('documents-service', () => {
 		expect(d.title).toBe('SOP');
 		expect(d.body).toBe('');
 		expect(d.projectId).toBe(null);
+		expect(d.pinned).toBe(false);
 		expect(d.createdBy).toBe(users.micha.id);
 		expect(d.createdAt).toBe(d.updatedAt);
 		expect(() => createDocument(db, users.micha, { title: '   ' })).toThrowError(/title is required/);
@@ -51,6 +52,13 @@ describe('documents-service', () => {
 		expect(upd.updatedAt >= d.updatedAt).toBe(true);
 		// clearing the project
 		expect(updateDocument(db, users.micha, d.id, { projectId: null }).projectId).toBe(null);
+	});
+
+	it('pins and unpins a doc (human and AI both allowed)', () => {
+		const d = createDocument(db, users.micha, { title: 'A' });
+		expect(updateDocument(db, users.micha, d.id, { pinned: true }).pinned).toBe(true);
+		expect(getDocument(db, users.micha, d.id).pinned).toBe(true);
+		expect(updateDocument(db, users.claude, d.id, { pinned: false }).pinned).toBe(false);
 	});
 
 	it('rejects empty title on update, 404 on unknown id', () => {
@@ -90,6 +98,26 @@ describe('documents-service', () => {
 		expect(listDocuments(db, users.micha, { q: 'kanban' }).map((d) => d.id)).toEqual([b.id]);
 		// no match
 		expect(listDocuments(db, users.micha, { q: 'zzz' })).toEqual([]);
+	});
+
+	it('sorts pinned docs first, newest-updated first within each group', async () => {
+		const a = createDocument(db, users.micha, { title: 'A' });
+		await new Promise((r) => setTimeout(r, 5));
+		const b = createDocument(db, users.micha, { title: 'B' });
+		await new Promise((r) => setTimeout(r, 5));
+		const c = createDocument(db, users.micha, { title: 'C' });
+
+		// unpinned: newest-updated first
+		expect(listDocuments(db, users.micha, {}).map((d) => d.id)).toEqual([c.id, b.id, a.id]);
+
+		// pin the oldest one — it should jump to the top despite being least recently updated
+		updateDocument(db, users.micha, a.id, { pinned: true });
+		expect(listDocuments(db, users.micha, {}).map((d) => d.id)).toEqual([a.id, c.id, b.id]);
+
+		// pin a second one — pinned group still sorted newest-updated first
+		await new Promise((r) => setTimeout(r, 5));
+		updateDocument(db, users.micha, b.id, { pinned: true });
+		expect(listDocuments(db, users.micha, {}).map((d) => d.id)).toEqual([b.id, a.id, c.id]);
 	});
 
 	it('links tasks idempotently and exposes both directions', () => {

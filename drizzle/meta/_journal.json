@@ -43,6 +43,13 @@
       "when": 1785082184700,
       "tag": "0005_private_projects",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1786369200934,
+      "tag": "0006_documents_pinned",
+      "breakpoints": true
     }
   ]
 }

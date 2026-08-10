@@ -73,6 +73,7 @@ export type DocumentDTO = {
 	title: string;
 	body: string; // Markdown source
 	projectId: number | null;
+	pinned: boolean;
 	createdBy: number;
 	createdAt: string; // ISO datetime
 	updatedAt: string;

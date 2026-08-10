@@ -1,0 +1,1 @@
+ALTER TABLE `documents` ADD `pinned` integer DEFAULT false NOT NULL;
