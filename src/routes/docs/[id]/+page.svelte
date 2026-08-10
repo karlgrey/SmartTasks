@@ -56,6 +56,23 @@
 		editing = true;
 	}
 
+	async function togglePin() {
+		if (!doc) return;
+		const before = doc;
+		const pinned = !doc.pinned;
+		doc = { ...doc, pinned }; // optimistic
+		try {
+			const saved = await api<DocumentDTO>(`/api/documents/${id}`, {
+				method: 'PATCH',
+				body: JSON.stringify({ pinned })
+			});
+			doc = { ...doc, ...saved };
+		} catch (err) {
+			doc = before; // rollback
+			error = (err as Error).message;
+		}
+	}
+
 	async function saveEdit() {
 		if (!doc || !editTitle.trim()) return;
 		try {
@@ -136,7 +153,18 @@
 	{:else}
 		<header class="doc-header">
 			<h1>{doc.title}</h1>
-			<button class="ghost" onclick={startEdit}>Edit</button>
+			<div class="header-actions">
+				<button
+					class="pin-btn"
+					class:pinned={doc.pinned}
+					aria-label={doc.pinned ? 'Unpin document' : 'Pin document'}
+					aria-pressed={doc.pinned}
+					onclick={togglePin}
+				>
+					📌
+				</button>
+				<button class="ghost" onclick={startEdit}>Edit</button>
+			</div>
 		</header>
 		<div class="meta">
 			{#if projectName}<a class="badge" href={`/docs?project=${doc.projectId}`}>{projectName}</a>{/if}
@@ -199,10 +227,38 @@
 		justify-content: space-between;
 		gap: 12px;
 	}
+	.header-actions {
+		display: flex;
+		gap: 8px;
+		flex: none;
+	}
 	h1 {
 		font-size: 22px;
 		margin: 0;
 		overflow-wrap: anywhere;
+	}
+	.pin-btn {
+		width: 34px;
+		padding: 0;
+		background: none;
+		border: 1px solid var(--border);
+		border-radius: 6px;
+		font-size: 15px;
+		line-height: 1;
+		cursor: pointer;
+		opacity: 0.35;
+		filter: grayscale(1);
+	}
+	.pin-btn.pinned {
+		opacity: 1;
+		filter: none;
+		border-color: var(--accent);
+	}
+	.pin-btn:hover {
+		opacity: 0.7;
+	}
+	.pin-btn.pinned:hover {
+		opacity: 1;
 	}
 	.meta {
 		display: flex;

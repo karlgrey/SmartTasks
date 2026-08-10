@@ -1,8 +1,17 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
+	import { api } from '$lib/client/api';
+	import type { DocumentDTO } from '$lib/types';
 
 	let { data } = $props();
+
+	// Local copy so pin toggles can update the list in place instead of a
+	// full reload; resynced whenever the server load reruns (filter change).
+	let docs = $state<DocumentDTO[]>([]);
+	$effect(() => {
+		docs = data.documents;
+	});
 
 	const projectName = (id: number | null) => {
 		const p = data.projects.find((p) => p.id === id);
@@ -16,6 +25,27 @@
 		else params.delete(key);
 		const qs = params.toString();
 		goto(`/docs${qs ? `?${qs}` : ''}`, { replaceState: true, keepFocus: true, noScroll: true });
+	}
+
+	function sortDocs(list: DocumentDTO[]) {
+		return [...list].sort(
+			(a, b) => Number(b.pinned) - Number(a.pinned) || (a.updatedAt < b.updatedAt ? 1 : -1)
+		);
+	}
+
+	async function togglePin(d: DocumentDTO) {
+		const before = docs;
+		const pinned = !d.pinned;
+		docs = sortDocs(docs.map((doc) => (doc.id === d.id ? { ...doc, pinned } : doc))); // optimistic
+		try {
+			const saved = await api<DocumentDTO>(`/api/documents/${d.id}`, {
+				method: 'PATCH',
+				body: JSON.stringify({ pinned })
+			});
+			docs = sortDocs(docs.map((doc) => (doc.id === d.id ? saved : doc)));
+		} catch {
+			docs = before; // rollback
+		}
 	}
 </script>
 
@@ -42,12 +72,21 @@
 	/>
 </div>
 
-{#if data.documents.length === 0}
+{#if docs.length === 0}
 	<p class="empty">No documents yet.</p>
 {:else}
 	<ul class="list">
-		{#each data.documents as d (d.id)}
+		{#each docs as d (d.id)}
 			<li>
+				<button
+					class="pin-btn"
+					class:pinned={d.pinned}
+					aria-label={d.pinned ? 'Unpin document' : 'Pin document'}
+					aria-pressed={d.pinned}
+					onclick={() => togglePin(d)}
+				>
+					📌
+				</button>
 				<a href={`/docs/${d.id}`}>
 					<span class="title">{d.title}</span>
 					<span class="meta">
@@ -100,7 +139,13 @@
 		display: grid;
 		gap: 6px;
 	}
+	.list li {
+		display: flex;
+		align-items: stretch;
+		gap: 6px;
+	}
 	.list a {
+		flex: 1;
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
@@ -114,6 +159,30 @@
 	}
 	.list a:hover {
 		border-color: var(--accent);
+	}
+	.pin-btn {
+		flex: none;
+		width: 36px;
+		padding: 0;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: var(--radius);
+		font-size: 15px;
+		line-height: 1;
+		cursor: pointer;
+		opacity: 0.35;
+		filter: grayscale(1);
+	}
+	.pin-btn.pinned {
+		opacity: 1;
+		filter: none;
+		border-color: var(--accent);
+	}
+	.pin-btn:hover {
+		opacity: 0.7;
+	}
+	.pin-btn.pinned:hover {
+		opacity: 1;
 	}
 	.title {
 		font-weight: 600;
