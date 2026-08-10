@@ -39,7 +39,9 @@ if [ -f data/smarttasks.db ]; then
   cp -n data/smarttasks.db "data/smarttasks.db.bak-\$(date +%F)" || true
 fi
 git pull --ff-only origin main
-npm ci --silent
+# npm install statt npm ci: das macOS-Lockfile enthält die Linux-seitigen
+# Optional-Deps (@emnapi/*) nicht — npm ci bricht dann ab (npm/cli#4828).
+npm install --no-audit --no-fund --silent
 npm run build
 sudo systemctl restart '$SERVICE'
 REMOTE
