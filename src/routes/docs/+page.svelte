@@ -1,17 +1,14 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
-	import { api } from '$lib/client/api';
 	import type { DocumentDTO } from '$lib/types';
 
 	let { data } = $props();
 
-	// Local copy so pin toggles can update the list in place instead of a
-	// full reload; resynced whenever the server load reruns (filter change).
-	let docs = $state<DocumentDTO[]>([]);
-	$effect(() => {
-		docs = data.documents;
-	});
+	// Server already orders pinned-first (documents-service listDocuments);
+	// split into two lists here purely for the pinned section's own markup.
+	const pinnedDocs = $derived(data.documents.filter((d) => d.pinned));
+	const otherDocs = $derived(data.documents.filter((d) => !d.pinned));
 
 	const projectName = (id: number | null) => {
 		const p = data.projects.find((p) => p.id === id);
@@ -26,28 +23,19 @@
 		const qs = params.toString();
 		goto(`/docs${qs ? `?${qs}` : ''}`, { replaceState: true, keepFocus: true, noScroll: true });
 	}
-
-	function sortDocs(list: DocumentDTO[]) {
-		return [...list].sort(
-			(a, b) => Number(b.pinned) - Number(a.pinned) || (a.updatedAt < b.updatedAt ? 1 : -1)
-		);
-	}
-
-	async function togglePin(d: DocumentDTO) {
-		const before = docs;
-		const pinned = !d.pinned;
-		docs = sortDocs(docs.map((doc) => (doc.id === d.id ? { ...doc, pinned } : doc))); // optimistic
-		try {
-			const saved = await api<DocumentDTO>(`/api/documents/${d.id}`, {
-				method: 'PATCH',
-				body: JSON.stringify({ pinned })
-			});
-			docs = sortDocs(docs.map((doc) => (doc.id === d.id ? saved : doc)));
-		} catch {
-			docs = before; // rollback
-		}
-	}
 </script>
+
+{#snippet docRow(d: DocumentDTO)}
+	<li>
+		<a href={`/docs/${d.id}`}>
+			<span class="title">{d.title}</span>
+			<span class="meta">
+				{#if projectName(d.projectId)}<span class="badge">{projectName(d.projectId)}</span>{/if}
+				<span class="date">{fmtDate(d.updatedAt)}</span>
+			</span>
+		</a>
+	</li>
+{/snippet}
 
 <header class="top">
 	<h1>Docs</h1>
@@ -72,29 +60,22 @@
 	/>
 </div>
 
-{#if docs.length === 0}
+{#if data.documents.length === 0}
 	<p class="empty">No documents yet.</p>
 {:else}
+	{#if pinnedDocs.length > 0}
+		<section class="pinned-section">
+			<h2 class="section-label">📌 Pinned</h2>
+			<ul class="list pinned-list">
+				{#each pinnedDocs as d (d.id)}
+					{@render docRow(d)}
+				{/each}
+			</ul>
+		</section>
+	{/if}
 	<ul class="list">
-		{#each docs as d (d.id)}
-			<li>
-				<button
-					class="pin-btn"
-					class:pinned={d.pinned}
-					aria-label={d.pinned ? 'Unpin document' : 'Pin document'}
-					aria-pressed={d.pinned}
-					onclick={() => togglePin(d)}
-				>
-					📌
-				</button>
-				<a href={`/docs/${d.id}`}>
-					<span class="title">{d.title}</span>
-					<span class="meta">
-						{#if projectName(d.projectId)}<span class="badge">{projectName(d.projectId)}</span>{/if}
-						<span class="date">{fmtDate(d.updatedAt)}</span>
-					</span>
-				</a>
-			</li>
+		{#each otherDocs as d (d.id)}
+			{@render docRow(d)}
 		{/each}
 	</ul>
 {/if}
@@ -132,6 +113,27 @@
 	.filters input {
 		flex: 1;
 	}
+	.pinned-section {
+		margin-bottom: 16px;
+		padding: 10px;
+		background: color-mix(in srgb, var(--accent) 6%, var(--surface));
+		border: 1px solid var(--border);
+		border-radius: var(--radius);
+	}
+	.section-label {
+		margin: 0 0 8px;
+		font-size: 12px;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.03em;
+		color: var(--muted);
+	}
+	.pinned-section .list {
+		margin: 0;
+	}
+	.pinned-section .list a {
+		background: var(--bg);
+	}
 	.list {
 		list-style: none;
 		margin: 0;
@@ -139,13 +141,7 @@
 		display: grid;
 		gap: 6px;
 	}
-	.list li {
-		display: flex;
-		align-items: stretch;
-		gap: 6px;
-	}
 	.list a {
-		flex: 1;
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
@@ -159,30 +155,6 @@
 	}
 	.list a:hover {
 		border-color: var(--accent);
-	}
-	.pin-btn {
-		flex: none;
-		width: 36px;
-		padding: 0;
-		background: var(--surface);
-		border: 1px solid var(--border);
-		border-radius: var(--radius);
-		font-size: 15px;
-		line-height: 1;
-		cursor: pointer;
-		opacity: 0.35;
-		filter: grayscale(1);
-	}
-	.pin-btn.pinned {
-		opacity: 1;
-		filter: none;
-		border-color: var(--accent);
-	}
-	.pin-btn:hover {
-		opacity: 0.7;
-	}
-	.pin-btn.pinned:hover {
-		opacity: 1;
 	}
 	.title {
 		font-weight: 600;
