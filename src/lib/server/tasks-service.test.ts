@@ -1,9 +1,18 @@
 import { describe, it, expect, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
-import { listTasks, createTask, parseTaskFilters, getTask, updateTask, deleteTask } from './tasks-service';
+import {
+	listTasks,
+	createTask,
+	parseTaskFilters,
+	getTask,
+	updateTask,
+	deleteTask,
+	getTaskCounts
+} from './tasks-service';
 import { testDb, seedUsers } from './test-utils';
 import { createUser } from './auth';
 import { tasks } from './db/schema';
+import { STATUSES } from '$lib/types';
 import { createLocation } from './locations-service';
 import { createProject } from './projects-service';
 import { addComment } from './comments-service';
@@ -404,5 +413,41 @@ describe('private projects — task visibility', () => {
 		expect(getTask(db, ulf, pub.id).documents).toEqual([]);
 		expect(getTask(db, micha, pub.id).documents.map((d) => d.id)).toContain(doc.id);
 		expect(getTask(db, claude, pub.id).documents.map((d) => d.id)).toContain(doc.id);
+	});
+});
+
+describe('getTaskCounts', () => {
+	it('returns a count per status, including zero for empty ones', () => {
+		const db = testDb();
+		const { micha } = seedUsers(db);
+		createTask(db, micha, { title: 'a' }); // Inbox
+		createTask(db, micha, { title: 'b' }); // Inbox
+		createTask(db, micha, { title: 'c', status: 'Done' });
+		const counts = getTaskCounts(db, micha);
+		expect(counts).toEqual({
+			Inbox: 2, 'To Do': 0, 'In Progress': 0, Supplier: 0, Review: 0, Done: 1, Icebox: 0
+		});
+		expect(Object.keys(counts).sort()).toEqual([...STATUSES].sort());
+	});
+
+	it('counts every status, not just the ones present in a small sample', () => {
+		const db = testDb();
+		const { micha } = seedUsers(db);
+		STATUSES.forEach((status, i) => createTask(db, micha, { title: `t${i}`, status }));
+		const counts = getTaskCounts(db, micha);
+		for (const status of STATUSES) expect(counts[status]).toBe(1);
+	});
+
+	it('applies the same private-project visibility as listTasks (no leak of foreign private counts)', () => {
+		const db = testDb();
+		const { micha, claude } = seedUsers(db);
+		const ulf = createUser(db, { name: 'Ulf', type: 'human' });
+		const priv = createProject(db, micha, { name: 'Privat', ownerId: micha.id });
+		createTask(db, micha, { title: 'geheim', projectId: priv.id });
+		createTask(db, micha, { title: 'oeffentlich' });
+
+		expect(getTaskCounts(db, micha).Inbox).toBe(2); // owner sees both
+		expect(getTaskCounts(db, claude).Inbox).toBe(2); // AI sees everything
+		expect(getTaskCounts(db, ulf).Inbox).toBe(1); // foreign human: private task hidden
 	});
 });

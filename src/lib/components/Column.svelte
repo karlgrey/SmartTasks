@@ -21,7 +21,7 @@
 	ondragover={(e) => e.preventDefault()}
 	{ondrop}
 >
-	<header>{status} <span class="count">{tasks.length}</span></header>
+	<header>{status} <span class="count">{board.countLabel(status, tasks.length)}</span></header>
 	<QuickAdd {status} />
 	<div class="cards">
 		{#each tasks as task (task.id)}

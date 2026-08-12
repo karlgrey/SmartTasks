@@ -24,7 +24,7 @@
 					class:active={mobileStatus === status}
 					onclick={() => (mobileStatus = status)}
 				>
-					{status} <span class="count">{columnTasks(status).length}</span>
+					{status} <span class="count">{board.countLabel(status, columnTasks(status).length)}</span>
 				</button>
 			{/each}
 		</nav>

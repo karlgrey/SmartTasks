@@ -175,6 +175,22 @@ export function createTask(db: Db, user: SafeUser, input: TaskInput): TaskDTO {
 	});
 }
 
+// One GROUP BY query for the board's lane headers — total per status under the
+// same visibility rule as listTasks (private-project tasks stay hidden from
+// non-owners), independent of any board filters or the Done page window.
+export function getTaskCounts(db: Db, user: SafeUser): Record<Status, number> {
+	const vis = taskVisibilityCond(user);
+	const rows = db
+		.select({ status: tasks.status, n: sql<number>`count(*)` })
+		.from(tasks)
+		.where(vis)
+		.groupBy(tasks.status)
+		.all();
+	const counts = Object.fromEntries(STATUSES.map((s) => [s, 0])) as Record<Status, number>;
+	for (const row of rows) counts[row.status as Status] = Number(row.n);
+	return counts;
+}
+
 export function parseTaskFilters(params: URLSearchParams): TaskFilters {
 	const f: TaskFilters = {};
 	const assignee = params.get('assignee');

@@ -18,6 +18,7 @@ Task manager shared by humans and AI agents. Base URL: this host.
 | Method & path | Purpose |
 |---|---|
 | GET /api/tasks | List. Query: assignee (user id or name), project (id), location (id, matches the task's project location), status, open=true (status ≠ Done), today=true (open, and due today or earlier — Europe/Berlin-local), q (text search; a bare number also matches that task id exactly, \`#18\` matches ids by prefix), limit, offset |
+| GET /api/tasks/counts | Total task count per status ({"Inbox": n, "To Do": n, ...}), same visibility rule as GET /api/tasks (no other filters apply) |
 | POST /api/tasks | Create: {title, description?, status?, priority?, size?, hours?, dueDate?, assigneeId?, projectId?} |
 | GET /api/tasks/:id | Detail incl. comments, statusEvents (status history: who set which status when), attachments (photos: id, filename, mime, size, createdBy, createdAt) and documents (linked docs: id, title) |
 | PATCH /api/tasks/:id | Partial update (same fields as create) |

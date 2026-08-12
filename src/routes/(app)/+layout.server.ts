@@ -1,7 +1,7 @@
 import { redirect } from '@sveltejs/kit';
 import type { LayoutServerLoad } from './$types';
 import { db } from '$lib/server/db';
-import { listTasks } from '$lib/server/tasks-service';
+import { listTasks, getTaskCounts } from '$lib/server/tasks-service';
 import { listProjects, listUsers } from '$lib/server/projects-service';
 import { listLocations } from '$lib/server/locations-service';
 
@@ -11,6 +11,7 @@ export const load: LayoutServerLoad = ({ locals }) => {
 		user: locals.user,
 		tasks: listTasks(db, locals.user, { open: true }),
 		done: listTasks(db, locals.user, { status: 'Done', limit: 50 }),
+		counts: getTaskCounts(db, locals.user),
 		users: listUsers(db),
 		projects: listProjects(db, locals.user),
 		locations: listLocations(db)

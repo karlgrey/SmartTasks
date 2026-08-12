@@ -1,4 +1,5 @@
-import type { TaskDTO, UserDTO, ProjectDTO, LocationDTO } from '$lib/types';
+import type { TaskDTO, UserDTO, ProjectDTO, LocationDTO, Status } from '$lib/types';
+import { STATUSES } from '$lib/types';
 import { parseTicketQuery } from '$lib/ticket-query';
 import { todayInBerlin } from '$lib/date-utils';
 import { api } from './api';
@@ -27,10 +28,15 @@ type InitData = {
 	user: UserDTO;
 	tasks: TaskDTO[];
 	done: TaskDTO[];
+	counts?: Record<Status, number>;
 	users: UserDTO[];
 	projects: ProjectDTO[];
 	locations: LocationDTO[];
 };
+
+function zeroCounts(): Record<Status, number> {
+	return Object.fromEntries(STATUSES.map((s) => [s, 0])) as Record<Status, number>;
+}
 
 class BoardState {
 	me = $state<UserDTO | null>(null);
@@ -38,6 +44,8 @@ class BoardState {
 	users = $state<UserDTO[]>([]);
 	projects = $state<ProjectDTO[]>([]);
 	locations = $state<LocationDTO[]>([]);
+	// Lane totals (independent of pagination/board filters), see /api/tasks/counts (#400).
+	counts = $state<Record<Status, number>>(zeroCounts());
 	flashes = $state<Record<number, boolean>>({});
 	lastDeletedId = $state<number | null>(null);
 	toasts = $state<{ id: number; message: string }[]>([]);
@@ -46,9 +54,30 @@ class BoardState {
 	init(data: InitData) {
 		this.me = data.user;
 		this.tasks = [...data.tasks, ...data.done];
+		this.counts = data.counts ?? zeroCounts();
 		this.users = data.users;
 		this.projects = data.projects;
 		this.locations = data.locations;
+	}
+
+	// Cheap fire-and-forget refresh of the lane totals; called after mutations
+	// that change a task's status or existence. Never awaited by callers, and
+	// failures are swallowed — the header just keeps showing the last known
+	// count rather than blocking or erroring the UI.
+	async loadCounts() {
+		try {
+			this.counts = await api<Record<Status, number>>('/api/tasks/counts');
+		} catch {
+			// best-effort; keep the previous counts on failure
+		}
+	}
+
+	// Header label for a lane: the plain total, or "visible/total" when the
+	// rendered subset (board filters, or the Done lane's pagination) differs
+	// from the true total.
+	countLabel(status: Status, visible: number): string {
+		const total = this.counts[status];
+		return visible === total ? String(total) : `${visible}/${total}`;
 	}
 
 	filtered(params: URLSearchParams): TaskDTO[] {
@@ -102,6 +131,7 @@ class BoardState {
 	async createTask(input: Partial<TaskDTO> & { title: string }) {
 		try {
 			this.upsert(await api<TaskDTO>('/api/tasks', { method: 'POST', body: JSON.stringify(input) }));
+			void this.loadCounts(); // fire-and-forget: a new task changes a lane's total
 		} catch (e) {
 			this.toast((e as Error).message);
 		}
@@ -117,6 +147,8 @@ class BoardState {
 				body: JSON.stringify(patch)
 			});
 			this.upsert(saved);
+			// only a status change moves a task between lanes and changes totals
+			if ('status' in patch) void this.loadCounts();
 		} catch (e) {
 			if (before) this.upsert(before); // rollback
 			this.toast((e as Error).message);
@@ -125,6 +157,9 @@ class BoardState {
 
 	remove(id: number) {
 		this.tasks = this.tasks.filter((t) => t.id !== id);
+		// covers both deleteTask (below) and SSE-driven removal (another user's/agent's
+		// delete) — either way a lane's total just changed
+		void this.loadCounts();
 	}
 
 	async deleteTask(id: number): Promise<boolean> {
