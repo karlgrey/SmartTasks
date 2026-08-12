@@ -197,7 +197,12 @@ class BoardState {
 					this.remove(e.task.id);
 					this.lastDeletedId = e.task.id;
 				}
-				else if (e.task) this.upsert(e.task, { flash: true });
+				else if (e.task) {
+					this.upsert(e.task, { flash: true });
+					// another user/agent may have moved the task between lanes —
+					// refresh the totals so the header never shows e.g. "13/12" (#400)
+					void this.loadCounts();
+				}
 			} catch {
 				// ignore malformed events
 			}
