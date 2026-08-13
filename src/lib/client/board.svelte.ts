@@ -72,12 +72,12 @@ class BoardState {
 		}
 	}
 
-	// Header label for a lane: the plain total, or "visible/total" when the
+	// Header label for a lane: the plain total, or "visible (total)" when the
 	// rendered subset (board filters, or the Done lane's pagination) differs
-	// from the true total.
+	// from the true total (Format-Wunsch Micha 12.08.: Klammern statt Slash).
 	countLabel(status: Status, visible: number): string {
 		const total = this.counts[status];
-		return visible === total ? String(total) : `${visible}/${total}`;
+		return visible === total ? String(total) : `${visible} (${total})`;
 	}
 
 	filtered(params: URLSearchParams): TaskDTO[] {
