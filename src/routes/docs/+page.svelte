@@ -30,6 +30,7 @@
 		<a href={`/docs/${d.id}`}>
 			<span class="title">{d.title}</span>
 			<span class="meta">
+				<span class="doc-id">#{d.id}</span>
 				{#if projectName(d.projectId)}<span class="badge">{projectName(d.projectId)}</span>{/if}
 				<span class="date">{fmtDate(d.updatedAt)}</span>
 			</span>
@@ -159,6 +160,9 @@
 	.title {
 		font-weight: 600;
 		overflow-wrap: anywhere;
+	}
+	.doc-id {
+		color: var(--muted);
 	}
 	.meta {
 		display: flex;

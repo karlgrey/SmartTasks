@@ -167,6 +167,7 @@
 			</div>
 		</header>
 		<div class="meta">
+			<span class="doc-id">#{doc.id}</span>
 			{#if projectName}<a class="badge" href={`/docs?project=${doc.projectId}`}>{projectName}</a>{/if}
 			<span>Created by {userName(doc.createdBy)}</span>
 			<span>· Updated {fmt(doc.updatedAt)}</span>
@@ -271,6 +272,9 @@
 	}
 	.meta a.badge {
 		text-decoration: none;
+	}
+	.doc-id {
+		color: var(--muted);
 	}
 	.body {
 		background: var(--surface);
