@@ -72,7 +72,14 @@
 	<button
 		class="logout"
 		onclick={async () => {
-			await fetch('/api/auth/logout', { method: 'POST' });
+			// TEMPORÄR (erratische Logouts, #453): Confirm + Quell-Marker, um
+			// versehentliche Klicks auszuschließen — Logout ohne Dialog heißt,
+			// der Request kam nicht von diesem Button.
+			if (!confirm('Wirklich ausloggen?')) return;
+			await fetch('/api/auth/logout', {
+				method: 'POST',
+				headers: { 'x-logout-source': 'filterbar-confirmed' }
+			});
 			location.href = '/login';
 		}}>Logout</button
 	>

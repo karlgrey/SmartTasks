@@ -10,8 +10,9 @@ export const POST: RequestHandler = ({ cookies, request }) => {
 	// Aufruf wird geloggt, um versehentliche Auslöser zu finden. Wieder
 	// entfernen, sobald die Ursache gefunden ist.
 	const ua = (request.headers.get('user-agent') ?? '').slice(0, 70);
+	const source = request.headers.get('x-logout-source') ?? 'UNBEKANNT';
 	console.log(
-		`[auth-debug] logout: cookie=${token ? token.slice(0, 8) + '…' : 'FEHLT'} ua="${ua}"`
+		`[auth-debug] logout: cookie=${token ? token.slice(0, 8) + '…' : 'FEHLT'} source=${source} ua="${ua}"`
 	);
 	if (token) deleteSession(db, token);
 	cookies.delete('session', { path: '/' });
