@@ -72,9 +72,9 @@
 	<button
 		class="logout"
 		onclick={async () => {
-			// TEMPORÄR (erratische Logouts, #453): Confirm + Quell-Marker, um
-			// versehentliche Klicks auszuschließen — Logout ohne Dialog heißt,
-			// der Request kam nicht von diesem Button.
+			// Confirm ist dauerhaft (Micha, 21.08.2026): schützt vor Fehlklicks.
+			// Der Quell-Marker unterscheidet im auth-debug-Log (#453) Button-
+			// Logouts von allem, was den Endpoint sonst noch aufrufen könnte.
 			if (!confirm('Wirklich ausloggen?')) return;
 			await fetch('/api/auth/logout', {
 				method: 'POST',
