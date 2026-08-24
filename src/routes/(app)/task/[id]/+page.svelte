@@ -443,7 +443,7 @@
 		overflow-y: auto;
 		/* padding-top hält das Close-X unterhalb der FilterBar-Zeile: sonst liegt
 		   es exakt über dem Logout-Button und ein Doppelklick aufs X loggt aus (#453) */
-		padding: 64px 18px 18px;
+		padding: 30px 18px 18px;
 		display: grid;
 		gap: 16px;
 		align-content: start;
