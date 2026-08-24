@@ -441,7 +441,9 @@
 		box-shadow: -8px 0 24px rgba(0, 0, 0, 0.12);
 		z-index: 11;
 		overflow-y: auto;
-		padding: 18px;
+		/* padding-top hält das Close-X unterhalb der FilterBar-Zeile: sonst liegt
+		   es exakt über dem Logout-Button und ein Doppelklick aufs X loggt aus (#453) */
+		padding: 64px 18px 18px;
 		display: grid;
 		gap: 16px;
 		align-content: start;
