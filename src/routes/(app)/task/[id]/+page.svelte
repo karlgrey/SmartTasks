@@ -292,12 +292,24 @@
 		<section class="description">
 			{#if editingDescription}
 				<textarea
+					class="description-edit"
 					value={detail.description}
 					onblur={(e) => {
 						save({ description: e.currentTarget.value });
 						editingDescription = false;
 					}}
 				></textarea>
+			{:else if detail.description}
+				<!-- Non-empty description: text stays plainly selectable/copyable — editing
+				     starts only via the explicit Edit button (#477), never via a click on the text. -->
+				<div class="description-actions">
+					<button class="ghost" aria-label="Edit description" onclick={() => (editingDescription = true)}>
+						Edit
+					</button>
+				</div>
+				<div class="rendered">
+					{@html renderMarkdown(detail.description)}
+				</div>
 			{:else}
 				<div
 					class="rendered"
@@ -306,11 +318,7 @@
 					role="button"
 					tabindex="0"
 				>
-					{#if detail.description}
-						{@html renderMarkdown(detail.description)}
-					{:else}
-						<span class="hint">Add a description…</span>
-					{/if}
+					<span class="hint">Add a description…</span>
 				</div>
 			{/if}
 		</section>
@@ -521,6 +529,25 @@
 	}
 	.hint {
 		color: var(--muted);
+	}
+	.description-actions {
+		display: flex;
+		justify-content: flex-end;
+	}
+	.description-actions .ghost {
+		padding: 4px 10px;
+		font-size: 12px;
+		border: 1px solid var(--border);
+		border-radius: 6px;
+		background: none;
+		color: var(--accent);
+		cursor: pointer;
+	}
+	.description-actions .ghost:hover {
+		background: var(--bg);
+	}
+	.description-edit {
+		min-height: 180px;
 	}
 	.comments {
 		display: grid;
