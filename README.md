@@ -15,6 +15,16 @@ Lean kanban task manager for humans and AI agents. SvelteKit + SQLite, one proce
 Agents authenticate with `Authorization: Bearer <api-key>` — full guide at `/api/docs`.
 Issue/rotate a key: `npx tsx scripts/create-api-key.ts <user-name>`.
 
+## Size & billing (#447)
+
+`size` (XS | S | M | L, nullable) maps to standard billing hours via
+`SIZE_HOURS` in `src/lib/types.ts`: XS=0.25h, S=1h, M=4h, L=8h. This is the
+single source for the standard value per size — exceptions from it are not
+modeled as data, they're noted as a free-text task comment. The unused
+`hours` field remains a plain manual override with no automation reading
+`SIZE_HOURS` yet (checked for #447: no per-project/month hours report exists
+either — see task comment).
+
 ## Deploy (Strato VPS)
 
 Production runs at https://tasks.remoterepublic.com on the labs VPS:

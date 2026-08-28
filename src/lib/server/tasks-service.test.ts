@@ -35,6 +35,17 @@ describe('createTask', () => {
 		expect(() => createTask(db, micha, { title: 'x', status: 'Doing' })).toThrowError();
 	});
 
+	it('accepts the XS size and still rejects unknown sizes (#447)', () => {
+		const db = testDb();
+		const { micha } = seedUsers(db);
+		const t = createTask(db, micha, { title: 'Tiny fix', size: 'XS' });
+		expect(t.size).toBe('XS');
+		expect(() =>
+			// @ts-expect-error invalid enum on purpose
+			createTask(db, micha, { title: 'x', size: 'XXL' })
+		).toThrowError('invalid size: must be one of XS, S, M, L');
+	});
+
 	it('allows AI users to create tasks directly in Done (creator rule)', () => {
 		const db = testDb();
 		const { claude } = seedUsers(db);
