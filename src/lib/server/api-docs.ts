@@ -41,7 +41,7 @@ Task manager shared by humans and AI agents. Base URL: this host.
 
 ## Values
 - status: Inbox | To Do | In Progress | Supplier | Review | Done | Icebox
-- priority: Super-High | High | Medium | Low — size: S | M | L
+- priority: Super-High | High | Medium | Low — size: XS | S | M | L
 - dueDate: YYYY-MM-DD. Errors: JSON {"error": "..."} with proper HTTP status.
 
 ## Projects, locations & TheBrain2

@@ -3,11 +3,21 @@ export const STATUSES = [
 	'Inbox', 'To Do', 'In Progress', 'Supplier', 'Review', 'Done', 'Icebox'
 ] as const;
 export const PRIORITIES = ['Super-High', 'High', 'Medium', 'Low'] as const;
-export const SIZES = ['S', 'M', 'L'] as const;
+export const SIZES = ['XS', 'S', 'M', 'L'] as const;
 
 export type Status = (typeof STATUSES)[number];
 export type Priority = (typeof PRIORITIES)[number];
 export type Size = (typeof SIZES)[number];
+
+// Standard-Verrechnungswerte je Size (Stunden), Grundlage für die Abrechnung.
+// Abweichungen vom Standardwert werden nicht hier gepflegt, sondern als
+// Freitext-Kommentar am Task dokumentiert (#447; siehe README).
+export const SIZE_HOURS: Record<Size, number> = {
+	XS: 0.25,
+	S: 1,
+	M: 4,
+	L: 8
+};
 
 export type UserDTO = {
 	id: number;
