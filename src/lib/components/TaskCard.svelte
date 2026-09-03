@@ -23,6 +23,7 @@
 	ondragstart={(e) => e.dataTransfer?.setData('text/task-id', String(task.id))}
 	onclick={() => goto(`/task/${task.id}${page.url.search}`)}
 >
+	<span class="ticket-id">#{task.id}</span>
 	<span class="title">{task.title}</span>
 	<span class="meta">
 		{#if task.priority}<span class="badge prio-{task.priority.toLowerCase()}">{task.priority}</span>{/if}
@@ -36,16 +37,25 @@
 
 <style>
 	.card {
+		position: relative;
 		display: grid;
 		gap: 6px;
 		width: 100%;
 		padding: 10px;
+		padding-right: 28px;
 		border: 1px solid var(--border);
 		border-radius: var(--radius);
 		background: var(--surface);
 		box-shadow: var(--shadow);
 		cursor: pointer;
 		text-align: left;
+	}
+	.ticket-id {
+		position: absolute;
+		top: 4px;
+		right: 6px;
+		font-size: 8px;
+		color: var(--muted);
 	}
 	.card:hover {
 		border-color: var(--accent);
