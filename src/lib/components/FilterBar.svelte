@@ -5,6 +5,75 @@
 
 	const current = $derived(new URLSearchParams(page.url.search));
 
+	let pwDialog: HTMLDialogElement | undefined = $state();
+	let currentPassword = $state('');
+	let newPassword = $state('');
+	let newPasswordRepeat = $state('');
+	let pwMessage = $state('');
+	let pwError = $state('');
+	let pwBusy = $state(false);
+
+	function resetPwForm() {
+		currentPassword = '';
+		newPassword = '';
+		newPasswordRepeat = '';
+		pwMessage = '';
+		pwError = '';
+	}
+
+	function openPwDialog() {
+		resetPwForm();
+		pwDialog?.showModal();
+	}
+
+	function translatePwError(error: string): string {
+		switch (error) {
+			case 'current password is wrong':
+				return 'Aktuelles Passwort ist falsch.';
+			case 'password too short':
+				return 'Neues Passwort muss mindestens 8 Zeichen haben.';
+			case 'password unchanged':
+				return 'Neues Passwort muss sich vom aktuellen unterscheiden.';
+			case 'user has no password':
+				return 'Für diesen Account ist kein Passwort hinterlegt.';
+			default:
+				return 'Passwort konnte nicht geändert werden.';
+		}
+	}
+
+	async function submitPwChange(e: SubmitEvent) {
+		e.preventDefault();
+		pwError = '';
+		pwMessage = '';
+		if (newPassword.length < 8) {
+			pwError = 'Neues Passwort muss mindestens 8 Zeichen haben.';
+			return;
+		}
+		if (newPassword !== newPasswordRepeat) {
+			pwError = 'Die Wiederholung stimmt nicht mit dem neuen Passwort überein.';
+			return;
+		}
+		pwBusy = true;
+		try {
+			const res = await fetch('/api/auth/password', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ currentPassword, newPassword })
+			});
+			const data = await res.json().catch(() => ({}));
+			if (!res.ok) {
+				pwError = translatePwError(data.error ?? '');
+				return;
+			}
+			pwMessage = 'Passwort geändert.';
+			setTimeout(() => pwDialog?.close(), 1200);
+		} catch {
+			pwError = 'Passwort konnte nicht geändert werden.';
+		} finally {
+			pwBusy = false;
+		}
+	}
+
 	function setParam(key: string, value: string | null) {
 		const params = new URLSearchParams(page.url.search);
 		if (value) params.set(key, value);
@@ -68,7 +137,11 @@
 		oninput={(e) => setParam('q', e.currentTarget.value || null)}
 	/>
 	<span class="spacer"></span>
-	<span class="me">{board.me?.name}</span>
+	{#if board.me?.type === 'ai'}
+		<span class="me">{board.me?.name}</span>
+	{:else}
+		<button class="me" onclick={openPwDialog}>{board.me?.name}</button>
+	{/if}
 	<button
 		class="logout"
 		onclick={async () => {
@@ -84,6 +157,40 @@
 		}}>Logout</button
 	>
 </nav>
+
+<dialog bind:this={pwDialog} class="pw-dialog">
+	<form onsubmit={submitPwChange}>
+		<h2>Passwort ändern</h2>
+		<label>
+			Aktuelles Passwort
+			<input type="password" autocomplete="current-password" bind:value={currentPassword} required />
+		</label>
+		<label>
+			Neues Passwort
+			<input type="password" autocomplete="new-password" bind:value={newPassword} required minlength="8" />
+		</label>
+		<label>
+			Neues Passwort wiederholen
+			<input
+				type="password"
+				autocomplete="new-password"
+				bind:value={newPasswordRepeat}
+				required
+				minlength="8"
+			/>
+		</label>
+		{#if pwError}
+			<p class="pw-error">{pwError}</p>
+		{/if}
+		{#if pwMessage}
+			<p class="pw-success">{pwMessage}</p>
+		{/if}
+		<div class="pw-actions">
+			<button type="button" onclick={() => pwDialog?.close()}>Abbrechen</button>
+			<button type="submit" disabled={pwBusy}>Speichern</button>
+		</div>
+	</form>
+</dialog>
 
 <style>
 	nav {
@@ -127,7 +234,17 @@
 		flex: 1;
 	}
 	.me {
+		border: 0;
+		background: none;
 		color: var(--muted);
+		font: inherit;
+		padding: 0;
+	}
+	button.me {
+		cursor: pointer;
+	}
+	button.me:hover {
+		text-decoration: underline;
 	}
 	.logout {
 		border: 0;
@@ -140,5 +257,67 @@
 			flex-wrap: nowrap;
 			overflow-x: auto;
 		}
+	}
+	.pw-dialog {
+		border: 1px solid var(--border);
+		border-radius: 10px;
+		padding: 0;
+		width: min(360px, calc(100vw - 32px));
+		background: var(--surface);
+		color: inherit;
+	}
+	.pw-dialog::backdrop {
+		background: rgb(0 0 0 / 0.4);
+	}
+	.pw-dialog form {
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+		padding: 18px;
+	}
+	.pw-dialog h2 {
+		margin: 0 0 4px 0;
+		font-size: 16px;
+	}
+	.pw-dialog label {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		font-size: 13px;
+		color: var(--muted);
+	}
+	.pw-dialog input {
+		padding: 6px 8px;
+		border: 1px solid var(--border);
+		border-radius: 6px;
+		font-size: 14px;
+	}
+	.pw-error {
+		color: #c0392b;
+		font-size: 13px;
+		margin: 0;
+	}
+	.pw-success {
+		color: #2e7d32;
+		font-size: 13px;
+		margin: 0;
+	}
+	.pw-actions {
+		display: flex;
+		justify-content: flex-end;
+		gap: 8px;
+		margin-top: 4px;
+	}
+	.pw-actions button {
+		padding: 6px 12px;
+		border-radius: 6px;
+		border: 1px solid var(--border);
+		background: var(--surface);
+		cursor: pointer;
+	}
+	.pw-actions button[type='submit'] {
+		background: var(--accent);
+		color: #fff;
+		border-color: var(--accent);
 	}
 </style>
