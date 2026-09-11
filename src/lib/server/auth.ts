@@ -4,6 +4,7 @@ import { eq, sql } from 'drizzle-orm';
 import type { Db } from './db';
 import { users, sessions } from './db/schema';
 import type { UserDTO } from '$lib/types';
+import { ServiceError } from './errors';
 
 export type SafeUser = UserDTO;
 
@@ -60,6 +61,27 @@ export function loginWithPassword(
 		.values({ token, userId: u.id, expiresAt: new Date(Date.now() + SESSION_TTL_MS) })
 		.run();
 	return { user: toSafeUser(u), token };
+}
+
+export function changePassword(
+	db: Db,
+	userId: number,
+	currentPassword: string,
+	newPassword: string
+): void {
+	const u = db.select().from(users).where(eq(users.id, userId)).get();
+	if (!u?.passwordHash) throw new ServiceError(400, 'user has no password');
+	if (!bcrypt.compareSync(currentPassword, u.passwordHash)) {
+		throw new ServiceError(401, 'current password is wrong');
+	}
+	if (newPassword.length < 8) throw new ServiceError(400, 'password too short');
+	if (bcrypt.compareSync(newPassword, u.passwordHash)) {
+		throw new ServiceError(400, 'password unchanged');
+	}
+	db.update(users)
+		.set({ passwordHash: bcrypt.hashSync(newPassword, 10) })
+		.where(eq(users.id, userId))
+		.run();
 }
 
 export function deleteSession(db: Db, token: string): void {

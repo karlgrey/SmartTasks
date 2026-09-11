@@ -1,6 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import { eq } from 'drizzle-orm';
-import { createUser, setApiKey, loginWithPassword, resolveUser, deleteSession } from './auth';
+import {
+	createUser,
+	setApiKey,
+	loginWithPassword,
+	resolveUser,
+	deleteSession,
+	changePassword
+} from './auth';
+import { ServiceError } from './errors';
 import { sessions } from './db/schema';
 import { testDb } from './test-utils';
 
@@ -43,5 +51,57 @@ describe('auth', () => {
 		const u = createUser(db, { name: 'X', email: 'x@test.dev', type: 'human', password: 'p' });
 		expect(u).not.toHaveProperty('passwordHash');
 		expect(u).not.toHaveProperty('apiKeyHash');
+	});
+
+	describe('changePassword', () => {
+		it('rejects a wrong current password', () => {
+			const db = testDb();
+			const u = createUser(db, { name: 'Micha', email: 'm@test.dev', type: 'human', password: 'secret1' });
+			try {
+				changePassword(db, u.id, 'wrong', 'newsecret1');
+				expect.unreachable();
+			} catch (e) {
+				expect(e).toBeInstanceOf(ServiceError);
+				expect((e as ServiceError).status).toBe(401);
+			}
+		});
+
+		it('rejects a new password that is too short', () => {
+			const db = testDb();
+			const u = createUser(db, { name: 'Micha', email: 'm@test.dev', type: 'human', password: 'secret1' });
+			try {
+				changePassword(db, u.id, 'secret1', 'short');
+				expect.unreachable();
+			} catch (e) {
+				expect(e).toBeInstanceOf(ServiceError);
+				expect((e as ServiceError).status).toBe(400);
+			}
+		});
+
+		it('rejects an unchanged password', () => {
+			const db = testDb();
+			const u = createUser(db, { name: 'Micha', email: 'm@test.dev', type: 'human', password: 'secret1' });
+			expect(() => changePassword(db, u.id, 'secret1', 'secret1')).toThrow(ServiceError);
+		});
+
+		it('changes the password so the new one works and the old one does not', () => {
+			const db = testDb();
+			const u = createUser(db, { name: 'Micha', email: 'm@test.dev', type: 'human', password: 'secret1' });
+			changePassword(db, u.id, 'secret1', 'newsecret1');
+			expect(loginWithPassword(db, 'm@test.dev', 'newsecret1')).not.toBeNull();
+			expect(loginWithPassword(db, 'm@test.dev', 'secret1')).toBeNull();
+		});
+
+		it('rejects a user without a password (e.g. an AI user)', () => {
+			const db = testDb();
+			const claude = createUser(db, { name: 'Claude', type: 'ai' });
+			try {
+				changePassword(db, claude.id, 'anything', 'newsecret1');
+				expect.unreachable();
+			} catch (e) {
+				expect(e).toBeInstanceOf(ServiceError);
+				expect((e as ServiceError).status).toBe(400);
+			}
+		});
 	});
 });
