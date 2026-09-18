@@ -13,6 +13,21 @@ export const users = sqliteTable('users', {
 	color: text('color').notNull().default('#6b7280')
 });
 
+// Mehrere API-Keys je User (#670): users.apiKeyHash bleibt als Spalte stehen
+// (ungenutzt, kein Datenverlust), neue Keys/Prüfungen laufen ausschließlich
+// über api_keys.
+export const apiKeys = sqliteTable('api_keys', {
+	id: integer('id').primaryKey({ autoIncrement: true }),
+	userId: integer('user_id')
+		.notNull()
+		.references(() => users.id),
+	name: text('name').notNull(),
+	keyHash: text('key_hash').notNull().unique(),
+	createdAt: text('created_at').notNull(),
+	lastUsedAt: text('last_used_at'),
+	revokedAt: text('revoked_at')
+});
+
 export const sessions = sqliteTable('sessions', {
 	token: text('token').primaryKey(),
 	userId: integer('user_id')

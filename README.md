@@ -13,7 +13,10 @@ Lean kanban task manager for humans and AI agents. SvelteKit + SQLite, one proce
 
 ## API
 Agents authenticate with `Authorization: Bearer <api-key>` — full guide at `/api/docs`.
-Issue/rotate a key: `npx tsx scripts/create-api-key.ts <user-name>`.
+A user can hold several keys (e.g. "Laptop", "labs"), checked independently
+against `api_keys` (#670). Issue an additional key:
+`npx tsx scripts/create-api-key.ts <user-name> [key-name]` (key-name defaults
+to "Key \<date\>"). Revoke one: `npx tsx scripts/revoke-api-key.ts <id>`.
 
 ## Size & billing (#447)
 

@@ -3,13 +3,15 @@ import { eq } from 'drizzle-orm';
 import {
 	createUser,
 	setApiKey,
+	revokeApiKey,
+	hashApiKey,
 	loginWithPassword,
 	resolveUser,
 	deleteSession,
 	changePassword
 } from './auth';
 import { ServiceError } from './errors';
-import { sessions } from './db/schema';
+import { sessions, apiKeys } from './db/schema';
 import { testDb } from './test-utils';
 
 describe('auth', () => {
@@ -44,6 +46,51 @@ describe('auth', () => {
 		expect(resolved?.name).toBe('Claude');
 		expect(resolved?.type).toBe('ai');
 		expect(resolveUser(db, { bearer: 'Bearer st_wrong' })).toBeNull();
+	});
+
+	describe('multiple api keys (#670)', () => {
+		it('resolves a user from any of their non-revoked keys, with a default name', () => {
+			const db = testDb();
+			const claude = createUser(db, { name: 'Claude', type: 'ai' });
+			const laptopKey = setApiKey(db, claude.id, 'Laptop');
+			const labsKey = setApiKey(db, claude.id);
+			expect(resolveUser(db, { bearer: `Bearer ${laptopKey}` })?.id).toBe(claude.id);
+			expect(resolveUser(db, { bearer: `Bearer ${labsKey}` })?.id).toBe(claude.id);
+			const labsRow = db.select().from(apiKeys).where(eq(apiKeys.keyHash, hashApiKey(labsKey))).get();
+			expect(labsRow?.name).toMatch(/^Key \d{4}-\d{2}-\d{2}$/);
+		});
+
+		it('sets lastUsedAt on a resolved key', () => {
+			const db = testDb();
+			const claude = createUser(db, { name: 'Claude', type: 'ai' });
+			const key = setApiKey(db, claude.id, 'Laptop');
+			const before = db.select().from(apiKeys).where(eq(apiKeys.keyHash, hashApiKey(key))).get()!;
+			expect(before.lastUsedAt).toBeNull();
+			resolveUser(db, { bearer: `Bearer ${key}` });
+			const after = db.select().from(apiKeys).where(eq(apiKeys.id, before.id)).get()!;
+			expect(after.lastUsedAt).not.toBeNull();
+		});
+
+		it('no longer resolves a revoked key, but other keys of the same user still work', () => {
+			const db = testDb();
+			const claude = createUser(db, { name: 'Claude', type: 'ai' });
+			const laptopKey = setApiKey(db, claude.id, 'Laptop');
+			const labsKey = setApiKey(db, claude.id, 'labs');
+			const labsRow = db.select().from(apiKeys).where(eq(apiKeys.keyHash, hashApiKey(labsKey))).get()!;
+			revokeApiKey(db, labsRow.id);
+			expect(resolveUser(db, { bearer: `Bearer ${labsKey}` })).toBeNull();
+			expect(resolveUser(db, { bearer: `Bearer ${laptopKey}` })?.id).toBe(claude.id);
+		});
+
+		it('rejects revoking an unknown or already-revoked key', () => {
+			const db = testDb();
+			const claude = createUser(db, { name: 'Claude', type: 'ai' });
+			expect(() => revokeApiKey(db, 999)).toThrow(ServiceError);
+			const key = setApiKey(db, claude.id, 'Laptop');
+			const row = db.select().from(apiKeys).where(eq(apiKeys.keyHash, hashApiKey(key))).get()!;
+			revokeApiKey(db, row.id);
+			expect(() => revokeApiKey(db, row.id)).toThrow(ServiceError);
+		});
 	});
 
 	it('never exposes hashes on SafeUser', () => {
