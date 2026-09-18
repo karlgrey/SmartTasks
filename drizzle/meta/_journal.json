@@ -50,6 +50,13 @@
       "when": 1786369200934,
       "tag": "0006_documents_pinned",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1789742730277,
+      "tag": "0007_api_keys",
+      "breakpoints": true
     }
   ]
 }

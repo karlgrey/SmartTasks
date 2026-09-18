@@ -1,8 +1,8 @@
 import bcrypt from 'bcryptjs';
 import { createHash, randomBytes } from 'node:crypto';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, isNull, sql } from 'drizzle-orm';
 import type { Db } from './db';
-import { users, sessions } from './db/schema';
+import { users, sessions, apiKeys } from './db/schema';
 import type { UserDTO } from '$lib/types';
 import { ServiceError } from './errors';
 
@@ -37,10 +37,29 @@ export function hashApiKey(key: string): string {
 	return createHash('sha256').update(key).digest('hex');
 }
 
-export function setApiKey(db: Db, userId: number): string {
+// Legt einen weiteren API-Key für den User an (#670: mehrere Keys je User,
+// z. B. "Laptop" und "labs", getrennt widerrufbar). Ohne Namen bleibt der
+// bisherige Aufruf kompatibel — Default-Name "Key <Datum>".
+export function setApiKey(db: Db, userId: number, name?: string): string {
 	const key = 'st_' + randomBytes(24).toString('hex');
-	db.update(users).set({ apiKeyHash: hashApiKey(key) }).where(eq(users.id, userId)).run();
+	db.insert(apiKeys)
+		.values({
+			userId,
+			name: name ?? `Key ${new Date().toISOString().slice(0, 10)}`,
+			keyHash: hashApiKey(key),
+			createdAt: new Date().toISOString()
+		})
+		.run();
 	return key;
+}
+
+// Widerruft einen Key dauerhaft (#670) — kein Hard-Delete, damit die
+// Historie (wer hatte wann welchen Key) erhalten bleibt.
+export function revokeApiKey(db: Db, id: number): void {
+	const row = db.select().from(apiKeys).where(eq(apiKeys.id, id)).get();
+	if (!row) throw new ServiceError(404, 'api key not found');
+	if (row.revokedAt) throw new ServiceError(400, 'api key already revoked');
+	db.update(apiKeys).set({ revokedAt: new Date().toISOString() }).where(eq(apiKeys.id, id)).run();
 }
 
 const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -94,8 +113,18 @@ export function resolveUser(
 ): SafeUser | null {
 	if (opts.bearer?.startsWith('Bearer ')) {
 		const hash = hashApiKey(opts.bearer.slice(7).trim());
-		const u = db.select().from(users).where(eq(users.apiKeyHash, hash)).get();
-		return u ? toSafeUser(u) : null;
+		const row = db
+			.select({ key: apiKeys, user: users })
+			.from(apiKeys)
+			.innerJoin(users, eq(users.id, apiKeys.userId))
+			.where(and(eq(apiKeys.keyHash, hash), isNull(apiKeys.revokedAt)))
+			.get();
+		if (!row) return null;
+		db.update(apiKeys)
+			.set({ lastUsedAt: new Date().toISOString() })
+			.where(eq(apiKeys.id, row.key.id))
+			.run();
+		return toSafeUser(row.user);
 	}
 	if (opts.sessionToken) {
 		const row = db
