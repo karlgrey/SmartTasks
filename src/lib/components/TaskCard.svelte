@@ -25,7 +25,7 @@
 	onclick={() => goto(`/task/${task.id}${page.url.search}`)}
 >
 	<span class="ticket-id">#{task.id}</span>
-	<span class="title">{#if task.status === 'Dropped'}<span class="dropped-icon" title="Verworfen">⊘</span> {/if}{task.title}</span>
+	<span class="title">{#if task.status === 'Dropped'}<span class="dropped-icon" title="Verworfen">⊘</span> {/if}{#if task.routineRunId}<span class="routine-icon" title="Routine-Lauf">↻</span> {/if}{task.title}</span>
 	<span class="meta">
 		{#if task.priority}<span class="badge prio-{task.priority.toLowerCase()}">{task.priority}</span>{/if}
 		{#if task.size}<span class="badge">{task.size}</span>{/if}
@@ -78,6 +78,9 @@
 	}
 	.card.dropped .title {
 		text-decoration: line-through;
+	}
+	.routine-icon {
+		color: var(--muted);
 	}
 	.dropped-icon {
 		display: inline-block;

@@ -99,6 +99,7 @@
 <nav>
 	<strong>SmartTasks</strong>
 	<a class="docs-link" href="/docs">Docs</a>
+	<a class="docs-link" href="/routines">Routinen</a>
 	{#each board.users as u (u.id)}
 		<button
 			class="chip"

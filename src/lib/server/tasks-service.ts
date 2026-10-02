@@ -1,14 +1,15 @@
 import { and, eq, notInArray, or, like, sql, asc, desc, type SQL } from 'drizzle-orm';
 import type { Db } from './db';
-import { tasks, users, comments, projects, statusEvents, attachments, documentTasks } from './db/schema';
+import { tasks, users, comments, projects, statusEvents, attachments, documentTasks, routines, routineRuns } from './db/schema';
 import { ServiceError } from './errors';
 import type { SafeUser } from './auth';
 import { deleteTaskAttachments, uploadsDir } from './attachments-service';
-import { STATUSES, PRIORITIES, SIZES, CLOSED_STATUSES, isClosed, type Status, type Priority, type Size, type TaskDTO, type CommentDTO, type StatusEventDTO, type AttachmentDTO, type DocRefDTO } from '$lib/types';
+import { STATUSES, PRIORITIES, SIZES, CLOSED_STATUSES, isClosed, type Status, type Priority, type Size, type TaskDTO, type CommentDTO, type StatusEventDTO, type AttachmentDTO, type DocRefDTO, type RunStatus } from '$lib/types';
 import { parseTicketQuery } from '$lib/ticket-query';
 import { todayInBerlin } from '$lib/date-utils';
 import { listDocRefsForTask } from './documents-service';
-import { assertTaskVisible, assertProjectUsable, taskVisibilityCond } from './visibility';
+import { assertTaskVisible, assertProjectUsable, assertVisibleByProject, taskVisibilityCond } from './visibility';
+import { assertRunLinkable, bindTaskToRun, releaseRunsOfTask, syncRunFromTask } from './routines-service';
 
 export type TaskFilters = {
 	assignee?: string;
@@ -32,6 +33,8 @@ export type TaskInput = {
 	dueDate?: string | null;
 	assigneeId?: number | null;
 	projectId?: number | null;
+	// Lauf einer Routine (#795) — nur per PATCH setz-/lösbar
+	routineRunId?: number | null;
 };
 
 export function assertEnum<T extends string>(
@@ -61,9 +64,10 @@ function validateTypes(input: Partial<TaskInput>): void {
 	assertType('hours', input.hours, 'number');
 	assertType('assigneeId', input.assigneeId, 'number');
 	assertType('projectId', input.projectId, 'number');
+	assertType('routineRunId', input.routineRunId, 'number');
 }
 
-function assertAssigneeAllowed(
+export function assertAssigneeAllowed(
 	db: Db,
 	project: { ownerId: number | null } | null,
 	assigneeId: number | null | undefined
@@ -142,6 +146,8 @@ export function createTask(db: Db, user: SafeUser, input: TaskInput): TaskDTO {
 	validateTypes(input);
 	if (!input.title?.trim()) throw new ServiceError(400, 'title is required');
 	validateEnums(input);
+	if (input.routineRunId !== undefined && input.routineRunId !== null)
+		throw new ServiceError(400, 'invalid routineRunId: can only be set via PATCH, or POST /api/routines/:id/runs/attach');
 	const project = assertProjectUsable(db, user, input.projectId);
 	assertAssigneeAllowed(db, project, input.assigneeId);
 	// AI users may create tasks directly in Done/Dropped: they are the creator
@@ -221,6 +227,8 @@ export function getTask(
 	statusEvents: StatusEventDTO[];
 	attachments: AttachmentDTO[];
 	documents: DocRefDTO[];
+	routine: { id: number; title: string } | null;
+	routineRun: { id: number; due: string; status: RunStatus } | null;
 } {
 	const task = db.select().from(tasks).where(eq(tasks.id, id)).get();
 	if (!task) throw new ServiceError(404, 'task not found');
@@ -243,8 +251,25 @@ export function getTask(
 		.where(eq(attachments.taskId, id))
 		.orderBy(asc(attachments.id))
 		.all();
+	let routine: { id: number; title: string } | null = null;
+	let routineRun: { id: number; due: string; status: RunStatus } | null = null;
+	if (task.routineRunId !== null) {
+		const run = db.select().from(routineRuns).where(eq(routineRuns.id, task.routineRunId)).get();
+		const r = run ? db.select().from(routines).where(eq(routines.id, run.routineId)).get() : undefined;
+		if (run && r) {
+			try {
+				assertVisibleByProject(db, user, r.projectId, 'routine not found');
+				routine = { id: r.id, title: r.title };
+				routineRun = { id: run.id, due: run.due, status: run.status };
+			} catch {
+				// routine in a foreign private project: stays hidden
+			}
+		}
+	}
 	return {
 		...task,
+		routine,
+		routineRun,
 		comments: taskComments,
 		statusEvents: events,
 		attachments: taskAttachments,
@@ -255,7 +280,7 @@ export function getTask(
 const UPDATABLE = [
 	'title', 'description', 'status', 'priority', 'size', 'hours',
 	'dueDate', 'assigneeId', 'projectId'
-] as const;
+] as const; // routineRunId is handled separately (bindTaskToRun)
 
 export function updateTask(
 	db: Db,
@@ -285,6 +310,9 @@ export function updateTask(
 	if (patch.status && isClosed(patch.status) && user.type === 'ai' && existing.createdBy !== user.id)
 		throw new ServiceError(403, 'AI users can only set Done or Dropped on tasks they created');
 
+	const linkRun = 'routineRunId' in patch;
+	if (linkRun) assertRunLinkable(db, user, id, patch.routineRunId ?? null);
+
 	const now = new Date().toISOString();
 	const next: Record<string, unknown> = { updatedAt: now };
 	for (const key of UPDATABLE) {
@@ -295,12 +323,15 @@ export function updateTask(
 		// completedAt = when the task was closed (done or dropped, #801)
 		next.completedAt = isClosed(patch.status!) ? now : null;
 	}
+	if (linkRun) next.routineRunId = patch.routineRunId ?? null;
 	return db.transaction((tx) => {
 		const task = tx.update(tasks).set(next).where(eq(tasks.id, id)).returning().get();
 		if (statusChanged)
 			tx.insert(statusEvents)
 				.values({ taskId: id, userId: user.id, fromStatus: existing.status, toStatus: patch.status!, createdAt: now })
 				.run();
+		if (linkRun) bindTaskToRun(tx, id, patch.routineRunId ?? null, task);
+		else if (statusChanged) syncRunFromTask(tx, id, patch.status!, now);
 		return task;
 	});
 }
@@ -313,6 +344,7 @@ export function deleteTask(db: Db, user: SafeUser, id: number, uploadsPath = upl
 	// attachment rows must go before the task row (FK); file unlink is best-effort
 	deleteTaskAttachments(db, id, uploadsPath);
 	db.transaction((tx) => {
+		releaseRunsOfTask(tx, id);
 		tx.delete(documentTasks).where(eq(documentTasks.taskId, id)).run();
 		tx.delete(comments).where(eq(comments.taskId, id)).run();
 		tx.delete(statusEvents).where(eq(statusEvents.taskId, id)).run();

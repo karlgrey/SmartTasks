@@ -1,6 +1,6 @@
 import { eq, sql, type SQL } from 'drizzle-orm';
 import type { Db } from './db';
-import { tasks, projects, documents } from './db/schema';
+import { tasks, projects, documents, routines } from './db/schema';
 import { ServiceError } from './errors';
 import type { SafeUser } from './auth';
 
@@ -22,6 +22,11 @@ export function projectVisibilityCond(user: SafeUser): SQL | undefined {
 export function documentVisibilityCond(user: SafeUser): SQL | undefined {
 	if (user.type === 'ai') return undefined;
 	return sql`(${documents.projectId} IS NULL OR ${documents.projectId} NOT IN (SELECT ${projects.id} FROM ${projects} WHERE ${projects.ownerId} IS NOT NULL AND ${projects.ownerId} != ${user.id}))`;
+}
+
+export function routineVisibilityCond(user: SafeUser): SQL | undefined {
+	if (user.type === 'ai') return undefined;
+	return sql`(${routines.projectId} NOT IN (SELECT ${projects.id} FROM ${projects} WHERE ${projects.ownerId} IS NOT NULL AND ${projects.ownerId} != ${user.id}))`;
 }
 
 // 404 (not 403): foreign private resources must not reveal their existence.

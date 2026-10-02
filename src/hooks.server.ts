@@ -1,6 +1,13 @@
 import type { Handle } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import { resolveUser } from '$lib/server/auth';
+import { tickRoutines } from '$lib/server/routines-service';
+import { emit } from '$lib/server/events';
+import { todayInBerlin } from '$lib/date-utils';
+
+// Routinen-Scheduler (#795): einmal je Berlin-Kalendertag, ausgelöst vom ersten
+// authentifizierten Request. Fehler dürfen nie den Request brechen.
+let lastTickDay = '';
 
 export const handle: Handle = async ({ event, resolve }) => {
 	const sessionToken = event.cookies.get('session');
@@ -18,6 +25,14 @@ export const handle: Handle = async ({ event, resolve }) => {
 			`[auth-debug] unauth document: path=${event.url.pathname}` +
 				` cookie=${sessionToken ? sessionToken.slice(0, 8) + '…' : 'FEHLT'} ua="${ua}"`
 		);
+	}
+	if (event.locals.user && todayInBerlin() !== lastTickDay) {
+		lastTickDay = todayInBerlin();
+		try {
+			for (const task of tickRoutines(db).tasks) emit({ type: 'task.created', task });
+		} catch (e) {
+			console.error('[routines] tick failed', e);
+		}
 	}
 	return resolve(event);
 };
