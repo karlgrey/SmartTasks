@@ -18,6 +18,12 @@ against `api_keys` (#670). Issue an additional key:
 `npx tsx scripts/create-api-key.ts <user-name> [key-name]` (key-name defaults
 to "Key \<date\>"). Revoke one: `npx tsx scripts/revoke-api-key.ts <id>`.
 
+## Routines (#795)
+Recurring work is its own entity (`routines` + `routine_runs`), documented in `/api/docs` ("Routines").
+A daily scheduler (`tickRoutines`, triggered by the first authenticated request of each Berlin calendar day
+in `hooks.server.ts`, or manually via `POST /api/routines/tick`) creates runs and — after the lead time —
+tasks. Rhythm math lives in `src/lib/rhythm.ts`.
+
 ## Size & billing (#447)
 
 `size` (XS | S | M | L, nullable) maps to standard billing hours via

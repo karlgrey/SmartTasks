@@ -66,6 +66,7 @@ export type TaskDTO = {
 	createdAt: string; // ISO datetime
 	updatedAt: string;
 	completedAt: string | null;
+	routineRunId: number | null; // Lauf einer Routine (#795), sonst null
 };
 
 export type CommentDTO = {
@@ -116,5 +117,45 @@ export type StatusEventDTO = {
 	userId: number;
 	fromStatus: Status | null;
 	toStatus: Status;
+	createdAt: string;
+};
+
+// Routinen (#795): wiederkehrende Arbeiten als eigene Entität mit Läufen.
+export const RHYTHM_UNITS = ['day', 'week', 'month', 'quarter', 'year'] as const;
+export type RhythmUnit = (typeof RHYTHM_UNITS)[number];
+export type Rhythm = {
+	unit: RhythmUnit;
+	interval: number;
+	weekday?: number; // 1=Mo..7=So, nur unit=week
+	dayOfMonth?: number; // 1..31, nur unit=month|quarter
+};
+export const RUN_STATUSES = ['open', 'done', 'skipped', 'missed'] as const;
+export type RunStatus = (typeof RUN_STATUSES)[number];
+
+export type RoutineDTO = {
+	id: number;
+	title: string;
+	description: string;
+	projectId: number;
+	locationId: number | null;
+	assigneeId: number | null;
+	rhythm: Rhythm;
+	leadDays: number;
+	materialize: boolean;
+	active: boolean;
+	nextDue: string; // YYYY-MM-DD
+	createdBy: number;
+	createdAt: string;
+	updatedAt: string;
+};
+
+export type RoutineRunDTO = {
+	id: number;
+	routineId: number;
+	due: string; // YYYY-MM-DD
+	status: RunStatus;
+	taskId: number | null;
+	doneAt: string | null;
+	note: string | null;
 	createdAt: string;
 };

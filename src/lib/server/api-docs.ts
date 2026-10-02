@@ -19,9 +19,9 @@ Task manager shared by humans and AI agents. Base URL: this host.
 |---|---|
 | GET /api/tasks | List. Query: assignee (user id or name), project (id), location (id, matches the task's project location), status (\`Done\`/\`Dropped\` are sorted newest-closed first), open=true (status neither Done nor Dropped), today=true (open, and due today or earlier — Europe/Berlin-local), q (text search; a bare number also matches that task id exactly, \`#18\` matches ids by prefix), limit, offset |
 | GET /api/tasks/counts | Total task count per status ({"Inbox": n, "To Do": n, ..., "Dropped": n}), same visibility rule as GET /api/tasks (no other filters apply) |
-| POST /api/tasks | Create: {title, description?, status?, priority?, size?, hours?, dueDate?, assigneeId?, projectId?} |
+| POST /api/tasks | Create: {title, description?, status?, priority?, size?, hours?, dueDate?, assigneeId?, projectId?} (\`routineRunId\` is PATCH-only, see Routines) |
 | GET /api/tasks/:id | Detail incl. comments, statusEvents (status history: who set which status when), attachments (photos: id, filename, mime, size, createdBy, createdAt) and documents (linked docs: id, title) |
-| PATCH /api/tasks/:id | Partial update (same fields as create) |
+| PATCH /api/tasks/:id | Partial update (same fields as create, plus \`routineRunId\`: link the task to a routine run / \`null\` to unlink) |
 | DELETE /api/tasks/:id | Delete a task incl. comments and history — human users only (403 for AI); returns \`{"ok": true}\` |
 | POST /api/tasks/:id/comments | Add comment: {body} |
 | GET /api/attachments/:id | The attachment's bytes (images inline, other types incl. PDF/docx/xlsx as a download). Upload/delete of attachments is human/web-UI only (403 for AI) |
@@ -38,6 +38,13 @@ Task manager shared by humans and AI agents. Base URL: this host.
 | DELETE /api/documents/:id/tasks/:taskId | Unlink a task from the doc |
 | POST /api/tasks/:id/documents | Link a doc to the task: {documentId} (reciprocal, same effect) |
 | DELETE /api/tasks/:id/documents/:documentId | Unlink a doc from the task |
+| GET /api/routines · POST /api/routines | List routines (query: project, assignee, active=true\|false; sorted by nextDue) · create (201) |
+| GET /api/routines/dashboard | Dashboard: counts + one entry per routine with state (see Routines) |
+| GET /api/routines/:id · PATCH · DELETE | Detail incl. last 12 runs · update · delete (human only, 409 if runs exist — deactivate instead) |
+| GET /api/routines/:id/runs · POST /api/routines/:id/runs | Run history (due desc, query: limit) · report a run (201) |
+| POST /api/routines/:id/runs/attach | Attach an existing task to a run: {taskId, due?} → {run, task} |
+| POST /api/routines/:id/materialize | "Create run now": {due?} → 201 {run, task} |
+| POST /api/routines/tick | Run the scheduler now (idempotent) → {today, runsCreated, tasksCreated, missed} |
 
 ## Values
 - status: Inbox | To Do | In Progress | Supplier | Review | Done | Icebox | Dropped
@@ -52,6 +59,32 @@ vault (\`wiki/projekte/<wikiRef>.md\`). When you work a task, read that page for
 context if a wikiRef is set. Locations are physical places; each project has at most one.
 Convention: every project gets a location — projects without a physical place (digital,
 overhead, cross-location work) use the location named \`None\`.
+
+## Routines
+A routine is a recurring piece of work (e.g. "Gehälter", monthly). It has **runs** (\`routine_runs\`, one per due date);
+a run becomes a task only shortly before it is due. Routines hang on a project (visibility = project visibility,
+foreign private → 404). Keep the routine title generic ("Gehälter"); the task title gets the period appended
+(\`Gehälter · Okt 2026\`, \`… · KW 42\`, \`… · Q4 2026\`, \`… · 2026\`, day: \`… · 05.10.\`).
+- Routine fields: \`title\`, \`description\`, \`projectId\` (required), \`locationId?\`, \`assigneeId?\`, \`rhythm\`, \`leadDays\`
+  (default: 3; week 1; day 0), \`materialize\` (default true), \`active\` (default true), \`nextDue\` (YYYY-MM-DD, must be >= today;
+  default = first occurrence on/after today).
+- \`rhythm\`: \`{"unit": "day|week|month|quarter|year", "interval": 1, "weekday?": 1-7 (Mon=1, only week), "dayOfMonth?": 1-31 (only month/quarter)}\`.
+  Day-of-month values beyond the month's length are clamped to the month end.
+- Run: \`{id, routineId, due, status: open|done|skipped|missed, taskId, doneAt, note, createdAt}\`, unique per (routine, due).
+- **Scheduler** (\`POST /api/routines/tick\`, also run automatically once per Berlin day by the first authenticated request):
+  for every active routine, as long as \`nextDue − leadDays <= today\`: ensure an open run for \`nextDue\`; if \`materialize\`
+  and the run has no task, create one (status To Do, dueDate = due, project/assignee from the routine, description ends with
+  \`Routine #<id>, Lauf fällig <due>\`); then advance \`nextDue\`. Open runs older than 7 days become \`missed\` (the task is left alone).
+- **Automation routines** (\`materialize: false\`) never get tasks: a bot reports each run via \`POST /api/routines/:id/runs\`
+  with \`{due?, status?: done|skipped|open (default done), note?}\` (due defaults to the oldest open/missed run, else \`nextDue\`;
+  upsert per due; \`nextDue\` moves past the reported due).
+- Tasks of a run keep their own status; closing one syncs the run: Done → done, Dropped → skipped (the routine keeps running),
+  any other status → open. Deleting the task keeps the run (taskId becomes null). Tasks carry \`routineRunId\`;
+  \`GET /api/tasks/:id\` adds \`routine: {id, title}\` and \`routineRun: {id, due, status}\`.
+- Dashboard (\`GET /api/routines/dashboard?project=&assignee=\`): \`{today, counts: {overdue, today, thisWeek}, routines: [{id, title,
+  rhythm, rhythmText, leadDays, materialize, active, project, assignee, lastRun, openRun, nextDue, state, task}]}\`;
+  \`state\` = paused | broken (a missed run among the last 12) | overdue | due (open run due within leadDays) | ok.
+- AI users may do everything except DELETE (403).
 
 ## Private projects
 - A project with \`ownerId\` set is private: visible only to its (human) owner and to AI users.
