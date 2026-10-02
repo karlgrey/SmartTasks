@@ -13,6 +13,8 @@
 		statusEvents: StatusEventDTO[];
 		attachments: AttachmentDTO[];
 		documents: DocRefDTO[];
+		routine?: { id: number; title: string } | null;
+		routineRun?: { id: number; due: string; status: string } | null;
 	};
 
 	let detail = $state<Detail | null>(null);
@@ -251,6 +253,12 @@
 			></textarea>
 			<button class="close" onclick={close} aria-label="Close">×</button>
 		</header>
+		{#if detail.routine}
+			<p class="routine-line">
+				↻ Routine: <a href={`/routines/${detail.routine.id}`}>{detail.routine.title}</a>
+				{#if detail.routineRun}<span class="routine-run">· Lauf {detail.routineRun.due} · {detail.routineRun.status}</span>{/if}
+			</p>
+		{/if}
 
 		<div class="fields">
 			<label>Status
@@ -489,6 +497,16 @@
 </aside>
 
 <style>
+	.routine-line {
+		margin: 4px 0 8px;
+		font-size: 13px;
+	}
+	.routine-line a {
+		color: var(--accent);
+	}
+	.routine-run {
+		color: var(--muted);
+	}
 	.overlay {
 		position: fixed;
 		inset: 0;
