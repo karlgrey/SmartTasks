@@ -108,6 +108,26 @@ describe('listTasks', () => {
 		expect(listTasks(db, micha, { limit: 2 })).toHaveLength(2);
 	});
 
+	it('treats Dropped like Done: excluded from open/today, listable via status, ordered by completedAt (#801)', () => {
+		const db = testDb();
+		const { micha } = seed(db);
+		createTask(db, micha, { title: 'Dropped one', status: 'Dropped', dueDate: '2000-01-01' });
+		expect(listTasks(db, micha, { open: true }).map((t) => t.title)).not.toContain('Dropped one');
+		expect(listTasks(db, micha, { today: true }).map((t) => t.title)).not.toContain('Dropped one');
+		expect(listTasks(db, micha, { status: 'Done' }).map((t) => t.title)).toEqual(['Done already']);
+		expect(listTasks(db, micha, { status: 'Dropped' }).map((t) => t.title)).toEqual(['Dropped one']);
+	});
+
+	it('orders the Dropped list by most recently dropped (#801)', () => {
+		const db = testDb();
+		const { micha } = seedUsers(db);
+		const older = createTask(db, micha, { title: 'Older dropped', status: 'Dropped', priority: 'Super-High' });
+		const newer = createTask(db, micha, { title: 'Newer dropped', status: 'Dropped', priority: 'Low' });
+		db.update(tasks).set({ completedAt: '2026-01-01T00:00:00.000Z' }).where(eq(tasks.id, older.id)).run();
+		db.update(tasks).set({ completedAt: '2026-02-01T00:00:00.000Z' }).where(eq(tasks.id, newer.id)).run();
+		expect(listTasks(db, micha, { status: 'Dropped', limit: 1 })[0].title).toBe('Newer dropped');
+	});
+
 	it('q matches ticket ids: exact for plain numbers, prefix for the #-form', () => {
 		const db = testDb();
 		const { micha } = seedUsers(db);
@@ -223,10 +243,22 @@ describe('updateTask', () => {
 		const { micha, claude } = seedUsers(db);
 		const t = createTask(db, micha, { title: 'AI task', assigneeId: claude.id });
 		expect(() => updateTask(db, claude, t.id, { status: 'Done' })).toThrowError(
-			'AI users can only set Done on tasks they created'
+			'AI users can only set Done or Dropped on tasks they created'
 		);
 		expect(updateTask(db, claude, t.id, { status: 'Review' }).status).toBe('Review');
 		expect(updateTask(db, micha, t.id, { status: 'Done' }).status).toBe('Done');
+	});
+
+	it('forbids AI users from setting Dropped on tasks they did not create (#801)', () => {
+		const db = testDb();
+		const { micha, claude } = seedUsers(db);
+		const t = createTask(db, micha, { title: 'AI task', assigneeId: claude.id });
+		expect(() => updateTask(db, claude, t.id, { status: 'Dropped' })).toThrowError(
+			'AI users can only set Done or Dropped on tasks they created'
+		);
+		const own = createTask(db, claude, { title: 'own' });
+		expect(updateTask(db, claude, own.id, { status: 'Dropped' }).status).toBe('Dropped');
+		expect(updateTask(db, micha, t.id, { status: 'Dropped' }).status).toBe('Dropped');
 	});
 
 	it('lets AI users set Done on tasks they created themselves, regardless of assignee', () => {
@@ -246,6 +278,16 @@ describe('updateTask', () => {
 		expect(done.completedAt).not.toBeNull();
 		const reopened = updateTask(db, micha, t.id, { status: 'To Do' });
 		expect(reopened.completedAt).toBeNull();
+	});
+
+	it('stamps and clears completedAt on Dropped transitions, also when created dropped (#801)', () => {
+		const db = testDb();
+		const { micha } = seedUsers(db);
+		expect(createTask(db, micha, { title: 'born dropped', status: 'Dropped' }).completedAt).not.toBeNull();
+		const t = createTask(db, micha, { title: 'Drop me' });
+		const dropped = updateTask(db, micha, t.id, { status: 'Dropped' });
+		expect(dropped.completedAt).not.toBeNull();
+		expect(updateTask(db, micha, t.id, { status: 'Icebox' }).completedAt).toBeNull();
 	});
 
 	it('ignores non-updatable fields and 404s on missing tasks', () => {
@@ -436,7 +478,7 @@ describe('getTaskCounts', () => {
 		createTask(db, micha, { title: 'c', status: 'Done' });
 		const counts = getTaskCounts(db, micha);
 		expect(counts).toEqual({
-			Inbox: 2, 'To Do': 0, 'In Progress': 0, Supplier: 0, Review: 0, Done: 1, Icebox: 0
+			Inbox: 2, 'To Do': 0, 'In Progress': 0, Supplier: 0, Review: 0, Done: 1, Icebox: 0, Dropped: 0
 		});
 		expect(Object.keys(counts).sort()).toEqual([...STATUSES].sort());
 	});

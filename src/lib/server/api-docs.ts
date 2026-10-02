@@ -10,15 +10,15 @@ Task manager shared by humans and AI agents. Base URL: this host.
 1. Fetch your open tasks: \`GET /api/tasks?assignee=<your-user-name>&open=true\` (sorted by priority, then due date).
 2. Work a task. Write your result as a comment: \`POST /api/tasks/:id/comments\` with \`{"body": "..."}\` (Markdown).
 3. Set the task to Review: \`PATCH /api/tasks/:id\` with \`{"status": "Review"}\`.
-4. Never set status \`Done\` on tasks created by humans — the server rejects it with 403; a human reviews and closes. Exception: tasks **you created yourself** (e.g. retroactive work documentation) may be set to Done directly.
+4. Never set status \`Done\` or \`Dropped\` on tasks created by humans — the server rejects it with 403; a human reviews and closes. Exception: tasks **you created yourself** (e.g. retroactive work documentation) may be set to Done or Dropped directly.
 5. New findings worth tracking? Create a task assigned to yourself: \`POST /api/tasks\`.
 6. Reference tasks as \`#<id>\` when communicating with humans — the id is shown in the UI.
 
 ## Endpoints
 | Method & path | Purpose |
 |---|---|
-| GET /api/tasks | List. Query: assignee (user id or name), project (id), location (id, matches the task's project location), status, open=true (status ≠ Done), today=true (open, and due today or earlier — Europe/Berlin-local), q (text search; a bare number also matches that task id exactly, \`#18\` matches ids by prefix), limit, offset |
-| GET /api/tasks/counts | Total task count per status ({"Inbox": n, "To Do": n, ...}), same visibility rule as GET /api/tasks (no other filters apply) |
+| GET /api/tasks | List. Query: assignee (user id or name), project (id), location (id, matches the task's project location), status (\`Done\`/\`Dropped\` are sorted newest-closed first), open=true (status neither Done nor Dropped), today=true (open, and due today or earlier — Europe/Berlin-local), q (text search; a bare number also matches that task id exactly, \`#18\` matches ids by prefix), limit, offset |
+| GET /api/tasks/counts | Total task count per status ({"Inbox": n, "To Do": n, ..., "Dropped": n}), same visibility rule as GET /api/tasks (no other filters apply) |
 | POST /api/tasks | Create: {title, description?, status?, priority?, size?, hours?, dueDate?, assigneeId?, projectId?} |
 | GET /api/tasks/:id | Detail incl. comments, statusEvents (status history: who set which status when), attachments (photos: id, filename, mime, size, createdBy, createdAt) and documents (linked docs: id, title) |
 | PATCH /api/tasks/:id | Partial update (same fields as create) |
@@ -40,7 +40,8 @@ Task manager shared by humans and AI agents. Base URL: this host.
 | DELETE /api/tasks/:id/documents/:documentId | Unlink a doc from the task |
 
 ## Values
-- status: Inbox | To Do | In Progress | Supplier | Review | Done | Icebox
+- status: Inbox | To Do | In Progress | Supplier | Review | Done | Icebox | Dropped
+- \`Done\` = erledigt; \`Dropped\` = bewusst verworfen/obsolet, nie gemacht (keine eigene Board-Spalte, sichtbar im Done-Umschalter „Verworfen"). Both set \`completedAt\` (time of closing); leaving them clears it. Convention when dropping: add a comment \`Verworfen: <Grund>\`.
 - priority: Super-High | High | Medium | Low — size: XS | S | M | L
 - dueDate: YYYY-MM-DD. Errors: JSON {"error": "..."} with proper HTTP status.
 
