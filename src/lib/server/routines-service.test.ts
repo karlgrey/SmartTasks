@@ -215,6 +215,14 @@ describe('updateRoutine', () => {
 		expect(w.nextDue).toBe(addDays(today, 40));
 	});
 
+	it('unchanged rhythm in a patch keeps nextDue (UI sends the field on every save)', () => {
+		const s = setup();
+		const far = addDays(today, 40);
+		const r = mk(s, { nextDue: far });
+		expect(updateRoutine(s.db, s.micha, r.id, { title: 'Neu', rhythm: { ...MONTHLY } }).nextDue).toBe(far);
+		expect(updateRoutine(s.db, s.micha, r.id, { rhythm: { ...MONTHLY, dayOfMonth: 20 } }).nextDue).not.toBe(far);
+	});
+
 	it('keeps existing open runs on rhythm change', () => {
 		const s = setup();
 		const r = mk(s, { nextDue: addDays(today, 1) });
@@ -406,6 +414,29 @@ describe('materializeRun', () => {
 });
 
 describe('tickRoutines', () => {
+	it('acceptance (#795): attach moves next_due, tick creates the run only inside the lead window, idempotent', () => {
+		const s = setup();
+		const r = createRoutine(s.db, s.micha, {
+			title: 'Überweisungsblock', projectId: s.project.id,
+			rhythm: { unit: 'week', interval: 1, weekday: 1 }, leadDays: 1, nextDue: addDays(today, 400)
+		});
+		// createRoutine refuses past dates; the scenario lives in Oct 2026
+		backdate(s, r.id, '2026-10-05');
+		const t738 = createTask(s.db, s.micha, { title: 'Überweisungsblock KW 41', dueDate: '2026-10-05', projectId: s.project.id });
+		const att = attachTask(s.db, s.micha, r.id, { taskId: t738.id });
+		expect(att.run).toMatchObject({ due: '2026-10-05', status: 'open', taskId: t738.id });
+		expect(getRoutine(s.db, s.micha, r.id).nextDue).toBe('2026-10-12');
+
+		expect(tickRoutines(s.db, '2026-10-10')).toMatchObject({ runsCreated: 0, tasksCreated: 0 });
+		const t11 = tickRoutines(s.db, '2026-10-11');
+		expect(t11).toMatchObject({ runsCreated: 1, tasksCreated: 1 });
+		expect(t11.tasks[0]).toMatchObject({ title: 'Überweisungsblock · KW 42', dueDate: '2026-10-12', status: 'To Do', createdBy: s.claude.id });
+		expect(getRoutine(s.db, s.micha, r.id).nextDue).toBe('2026-10-19');
+		expect(tickRoutines(s.db, '2026-10-11')).toMatchObject({ runsCreated: 0, tasksCreated: 0 });
+		expect(s.db.select().from(routineRuns).all()).toHaveLength(2);
+		expect(s.db.select().from(tasks).all()).toHaveLength(2);
+	});
+
 	it('is idempotent: two ticks same day = one run, one task', () => {
 		const s = setup();
 		const r = mk(s, { nextDue: addDays(today, 1) });

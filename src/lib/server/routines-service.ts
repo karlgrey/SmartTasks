@@ -103,6 +103,10 @@ function assertLocation(db: Db, locationId: unknown): void {
 		throw new ServiceError(400, 'invalid locationId: location not found');
 }
 
+function sameRhythm(a: Rhythm, b: Rhythm): boolean {
+	return a.unit === b.unit && a.interval === b.interval && a.weekday === b.weekday && a.dayOfMonth === b.dayOfMonth;
+}
+
 function defaultLeadDays(rhythm: Rhythm): number {
 	return rhythm.unit === 'week' ? 1 : rhythm.unit === 'day' ? 0 : 3;
 }
@@ -273,8 +277,10 @@ export function updateRoutine(db: Db, user: SafeUser, id: number, patch: Partial
 	if (patch.rhythm !== undefined) {
 		const rhythm = checkRhythm(patch.rhythm);
 		next.rhythm = rhythm;
-		// existing open runs stay; only the next occurrence is recomputed
-		if (patch.nextDue === undefined) next.nextDue = firstDueOnOrAfter(rhythm, today);
+		// existing open runs stay; only the next occurrence is recomputed — and only
+		// when the rhythm really changed (the UI always sends the field, #795 review)
+		if (patch.nextDue === undefined && !sameRhythm(rhythm, existing.rhythm))
+			next.nextDue = firstDueOnOrAfter(rhythm, today);
 	}
 	return db.update(routines).set(next).where(eq(routines.id, id)).returning().get();
 }
