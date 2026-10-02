@@ -1,10 +1,10 @@
-import { and, eq, ne, or, like, sql, asc, desc, type SQL } from 'drizzle-orm';
+import { and, eq, notInArray, or, like, sql, asc, desc, type SQL } from 'drizzle-orm';
 import type { Db } from './db';
 import { tasks, users, comments, projects, statusEvents, attachments, documentTasks } from './db/schema';
 import { ServiceError } from './errors';
 import type { SafeUser } from './auth';
 import { deleteTaskAttachments, uploadsDir } from './attachments-service';
-import { STATUSES, PRIORITIES, SIZES, type Status, type Priority, type Size, type TaskDTO, type CommentDTO, type StatusEventDTO, type AttachmentDTO, type DocRefDTO } from '$lib/types';
+import { STATUSES, PRIORITIES, SIZES, CLOSED_STATUSES, isClosed, type Status, type Priority, type Size, type TaskDTO, type CommentDTO, type StatusEventDTO, type AttachmentDTO, type DocRefDTO } from '$lib/types';
 import { parseTicketQuery } from '$lib/ticket-query';
 import { todayInBerlin } from '$lib/date-utils';
 import { listDocRefsForTask } from './documents-service';
@@ -105,10 +105,10 @@ export function listTasks(db: Db, user: SafeUser, filters: TaskFilters = {}): Ta
 			sql`${tasks.projectId} IN (SELECT ${projects.id} FROM ${projects} WHERE ${projects.locationId} = ${filters.location})`
 		);
 	if (filters.status) conds.push(eq(tasks.status, filters.status));
-	if (filters.open) conds.push(ne(tasks.status, 'Done'));
+	if (filters.open) conds.push(notInArray(tasks.status, [...CLOSED_STATUSES]));
 	if (filters.today) {
 		// open tasks due today or earlier, "today" being Europe/Berlin-local
-		conds.push(ne(tasks.status, 'Done'));
+		conds.push(notInArray(tasks.status, [...CLOSED_STATUSES]));
 		conds.push(sql`${tasks.dueDate} IS NOT NULL AND ${tasks.dueDate} <= ${todayInBerlin()}`);
 	}
 	if (filters.q) {
@@ -132,7 +132,7 @@ export function listTasks(db: Db, user: SafeUser, filters: TaskFilters = {}): Ta
 		.select()
 		.from(tasks)
 		.where(conds.length ? and(...conds) : undefined)
-		.orderBy(...(filters.status === 'Done' ? doneOrder : boardOrder))
+		.orderBy(...(filters.status && isClosed(filters.status) ? doneOrder : boardOrder))
 		.limit(filters.limit ?? -1)
 		.offset(filters.offset ?? 0)
 		.all();
@@ -144,7 +144,7 @@ export function createTask(db: Db, user: SafeUser, input: TaskInput): TaskDTO {
 	validateEnums(input);
 	const project = assertProjectUsable(db, user, input.projectId);
 	assertAssigneeAllowed(db, project, input.assigneeId);
-	// AI users may create tasks directly in Done: they are the creator
+	// AI users may create tasks directly in Done/Dropped: they are the creator
 	// (retroactive work documentation). Setting Done on OTHERS' tasks stays
 	// forbidden — see updateTask.
 	const now = new Date().toISOString();
@@ -164,7 +164,7 @@ export function createTask(db: Db, user: SafeUser, input: TaskInput): TaskDTO {
 				createdBy: user.id,
 				createdAt: now,
 				updatedAt: now,
-				completedAt: input.status === 'Done' ? now : null
+				completedAt: input.status && isClosed(input.status) ? now : null
 			})
 			.returning()
 			.get();
@@ -282,8 +282,8 @@ export function updateTask(
 			: null;
 	const effectiveAssignee = 'assigneeId' in patch ? (patch.assigneeId ?? null) : existing.assigneeId;
 	assertAssigneeAllowed(db, project, effectiveAssignee);
-	if (patch.status === 'Done' && user.type === 'ai' && existing.createdBy !== user.id)
-		throw new ServiceError(403, 'AI users can only set Done on tasks they created');
+	if (patch.status && isClosed(patch.status) && user.type === 'ai' && existing.createdBy !== user.id)
+		throw new ServiceError(403, 'AI users can only set Done or Dropped on tasks they created');
 
 	const now = new Date().toISOString();
 	const next: Record<string, unknown> = { updatedAt: now };
@@ -292,7 +292,8 @@ export function updateTask(
 	}
 	const statusChanged = !!patch.status && patch.status !== existing.status;
 	if (statusChanged) {
-		next.completedAt = patch.status === 'Done' ? now : null;
+		// completedAt = when the task was closed (done or dropped, #801)
+		next.completedAt = isClosed(patch.status!) ? now : null;
 	}
 	return db.transaction((tx) => {
 		const task = tx.update(tasks).set(next).where(eq(tasks.id, id)).returning().get();

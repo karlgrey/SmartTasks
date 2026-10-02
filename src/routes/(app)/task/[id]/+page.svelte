@@ -5,7 +5,7 @@
 	import { board } from '$lib/client/board.svelte';
 	import { renderMarkdown } from '$lib/client/markdown';
 	import { downscaleImage } from '$lib/client/image';
-	import { STATUSES, PRIORITIES, SIZES } from '$lib/types';
+	import { BOARD_STATUSES, PRIORITIES, SIZES } from '$lib/types';
 	import type { TaskDTO, CommentDTO, Status, Priority, Size, StatusEventDTO, AttachmentDTO, DocRefDTO, DocumentDTO } from '$lib/types';
 
 	type Detail = TaskDTO & {
@@ -21,6 +21,8 @@
 	let confirmDelete = $state(false);
 	let confirmPhotoDelete = $state<number | null>(null);
 	let closing = $state(false);
+	let dropping = $state(false);
+	let dropReason = $state('');
 
 	const id = $derived(Number(page.params.id));
 
@@ -35,6 +37,8 @@
 		detail = null;
 		confirmDelete = false;
 		closing = false;
+		dropping = false;
+		dropReason = '';
 		api<Detail>(`/api/tasks/${current}`)
 			.then((d) => {
 				if (current === id) detail = d;
@@ -76,6 +80,31 @@
 				})
 				.catch(() => {});
 		}
+	}
+
+	// Verwerfen (#801): Pflicht-Grund wird als Kommentar „Verworfen: <Grund>"
+	// gespeichert — erst nachdem der Status wirklich auf Dropped steht.
+	async function drop() {
+		const reason = dropReason.trim();
+		if (!reason) return;
+		const current = id;
+		await board.patchTask(current, { status: 'Dropped' });
+		if (board.tasks.find((t) => t.id === current)?.status !== 'Dropped') return; // rolled back, toast shown
+		try {
+			await api<CommentDTO>(`/api/tasks/${current}/comments`, {
+				method: 'POST',
+				body: JSON.stringify({ body: `Verworfen: ${reason}` })
+			});
+		} catch (err) {
+			board.toast((err as Error).message);
+		}
+		dropping = false;
+		dropReason = '';
+		api<Detail>(`/api/tasks/${current}`)
+			.then((d) => {
+				if (current === id) detail = d;
+			})
+			.catch(() => {});
 	}
 
 	async function addComment(e: SubmitEvent) {
@@ -229,7 +258,9 @@
 					value={detail.status}
 					onchange={(e) => save({ status: e.currentTarget.value as Status })}
 				>
-					{#each STATUSES as s (s)}<option>{s}</option>{/each}
+					{#each BOARD_STATUSES as s (s)}<option>{s}</option>{/each}
+					<!-- Dropped only via „Verwerfen" (Pflicht-Grund); shown here only to display it -->
+					{#if detail.status === 'Dropped'}<option>Dropped</option>{/if}
 				</select>
 			</label>
 			<label>Priority
@@ -288,6 +319,33 @@
 				/>
 			</label>
 		</div>
+
+		{#if detail.status !== 'Dropped'}
+			<section class="drop">
+				{#if dropping}
+					<form
+						onsubmit={(e) => {
+							e.preventDefault();
+							drop();
+						}}
+					>
+						<input
+							type="text"
+							bind:value={dropReason}
+							placeholder="Grund (ein Satz)"
+							aria-label="Grund fürs Verwerfen"
+							required
+						/>
+						<button type="submit" class="confirm" disabled={!dropReason.trim()}>Verwerfen</button>
+						<button type="button" class="ghost" onclick={() => ((dropping = false), (dropReason = ''))}>
+							Abbrechen
+						</button>
+					</form>
+				{:else}
+					<button class="ghost" onclick={() => (dropping = true)}>⊘ Verwerfen</button>
+				{/if}
+			</section>
+		{/if}
 
 		<section class="description">
 			{#if editingDescription}
@@ -529,6 +587,37 @@
 	}
 	.hint {
 		color: var(--muted);
+	}
+	.drop form {
+		display: flex;
+		gap: 6px;
+		align-items: center;
+	}
+	.drop input {
+		flex: 1;
+		min-width: 0;
+		padding: 6px 8px;
+		border: 1px solid var(--border);
+		border-radius: 6px;
+	}
+	.drop button {
+		padding: 6px 10px;
+		font-size: 12px;
+		border: 1px solid var(--border);
+		border-radius: 6px;
+		background: none;
+		color: var(--muted);
+		cursor: pointer;
+		white-space: nowrap;
+	}
+	.drop button.confirm {
+		background: var(--muted);
+		border-color: var(--muted);
+		color: #fff;
+	}
+	.drop button.confirm:disabled {
+		opacity: 0.5;
+		cursor: default;
 	}
 	.description-actions {
 		display: flex;

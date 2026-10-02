@@ -2,7 +2,7 @@
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
 	import { board } from '$lib/client/board.svelte';
-	import type { TaskDTO } from '$lib/types';
+	import { isClosed, type TaskDTO } from '$lib/types';
 
 	let { task }: { task: TaskDTO } = $props();
 
@@ -12,19 +12,20 @@
 		project ? board.locations.find((l) => l.id === project.locationId) : undefined
 	);
 	const overdue = $derived(
-		!!task.dueDate && task.status !== 'Done' && task.dueDate < new Date().toISOString().slice(0, 10)
+		!!task.dueDate && !isClosed(task.status) && task.dueDate < new Date().toISOString().slice(0, 10)
 	);
 </script>
 
 <button
 	class="card"
 	class:flash={board.flashes[task.id]}
+	class:dropped={task.status === 'Dropped'}
 	draggable="true"
 	ondragstart={(e) => e.dataTransfer?.setData('text/task-id', String(task.id))}
 	onclick={() => goto(`/task/${task.id}${page.url.search}`)}
 >
 	<span class="ticket-id">#{task.id}</span>
-	<span class="title">{task.title}</span>
+	<span class="title">{#if task.status === 'Dropped'}<span class="dropped-icon" title="Verworfen">⊘</span> {/if}{task.title}</span>
 	<span class="meta">
 		{#if task.priority}<span class="badge prio-{task.priority.toLowerCase()}">{task.priority}</span>{/if}
 		{#if task.size}<span class="badge">{task.size}</span>{/if}
@@ -69,6 +70,18 @@
 	}
 	.title {
 		font-weight: 500;
+	}
+	/* #801: verworfene Tasks grau und durchgestrichen */
+	.card.dropped {
+		background: var(--bg);
+		color: var(--muted);
+	}
+	.card.dropped .title {
+		text-decoration: line-through;
+	}
+	.dropped-icon {
+		display: inline-block;
+		text-decoration: none;
 	}
 	.meta {
 		display: flex;

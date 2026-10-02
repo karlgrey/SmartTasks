@@ -2,29 +2,30 @@
 	import { page } from '$app/state';
 	import { MediaQuery } from 'svelte/reactivity';
 	import Column from './Column.svelte';
-	import { board, compareDone } from '$lib/client/board.svelte';
-	import { STATUSES, type Status } from '$lib/types';
+	import { board } from '$lib/client/board.svelte';
+	import { BOARD_STATUSES, type Status } from '$lib/types';
 
 	const filtered = $derived(board.filtered(page.url.searchParams));
 	const isMobile = new MediaQuery('(max-width: 767px)');
 	let mobileStatus = $state<Status>('Inbox');
 
 	function columnTasks(status: Status) {
-		const inColumn = filtered.filter((t) => t.status === status);
-		return status === 'Done' ? inColumn.sort(compareDone) : inColumn;
+		return board.laneTasks(filtered, status);
 	}
+	// lane header count: the Done lane counts whatever its toggle shows (#801)
+	const countStatus = (status: Status): Status => (status === 'Done' ? board.closedView : status);
 </script>
 
 {#if isMobile.current}
 	<div class="board mobile">
 		<nav class="status-tabs">
-			{#each STATUSES as status (status)}
+			{#each BOARD_STATUSES as status (status)}
 				<button
 					class="tab"
 					class:active={mobileStatus === status}
 					onclick={() => (mobileStatus = status)}
 				>
-					{status} <span class="count">{board.countLabel(status, columnTasks(status).length)}</span>
+					{status} <span class="count">{board.countLabel(countStatus(status), columnTasks(status).length)}</span>
 				</button>
 			{/each}
 		</nav>
@@ -32,7 +33,7 @@
 	</div>
 {:else}
 	<div class="board">
-		{#each STATUSES as status (status)}
+		{#each BOARD_STATUSES as status (status)}
 			<Column {status} tasks={columnTasks(status)} />
 		{/each}
 	</div>

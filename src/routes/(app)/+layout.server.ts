@@ -11,6 +11,7 @@ export const load: LayoutServerLoad = ({ locals }) => {
 		user: locals.user,
 		tasks: listTasks(db, locals.user, { open: true }),
 		done: listTasks(db, locals.user, { status: 'Done', limit: 50 }),
+		dropped: listTasks(db, locals.user, { status: 'Dropped', limit: 50 }),
 		counts: getTaskCounts(db, locals.user),
 		users: listUsers(db),
 		projects: listProjects(db, locals.user),

@@ -99,9 +99,10 @@ describe('today filter', () => {
 		const dueTomorrow = task({ id: 3, dueDate: '2026-07-26' });
 		const noDue = task({ id: 4, dueDate: null });
 		const doneToday = task({ id: 5, dueDate: '2026-07-25', status: 'Done' });
+		const droppedOverdue = task({ id: 6, dueDate: '2026-07-20', status: 'Dropped' });
 		board.init({
 			user: { id: 1, name: 'M', email: null, type: 'human', color: '#fff' },
-			tasks: [dueTomorrow, noDue, doneToday, dueToday, overdue],
+			tasks: [dueTomorrow, noDue, doneToday, droppedOverdue, dueToday, overdue],
 			done: [],
 			users: [],
 			projects: [],
@@ -190,5 +191,30 @@ describe('filterDefaults', () => {
 		});
 		expect(board.filterDefaults(new URLSearchParams('q=wood'))).toEqual({});
 		expect(board.filterDefaults(new URLSearchParams(''))).toEqual({});
+	});
+});
+
+describe('Done lane toggle Erledigt | Verworfen (#801)', () => {
+	const me = { id: 1, name: 'M', email: null, type: 'human' as const, color: '#fff' };
+
+	it('init merges the dropped page into the task list', () => {
+		const dropped = task({ id: 2, status: 'Dropped' });
+		board.init({ user: me, tasks: [task({ id: 1 })], done: [], dropped: [dropped], users: [], projects: [], locations: [] });
+		expect(board.tasks.map((t) => t.id)).toEqual([1, 2]);
+	});
+
+	it('the Done lane shows Done by default and Dropped when toggled, newest first', () => {
+		const done = task({ id: 1, status: 'Done', completedAt: '2026-01-01T00:00:00.000Z' });
+		const dropOld = task({ id: 2, status: 'Dropped', completedAt: '2026-01-01T00:00:00.000Z' });
+		const dropNew = task({ id: 3, status: 'Dropped', completedAt: '2026-02-01T00:00:00.000Z' });
+		const open = task({ id: 4, status: 'To Do' });
+		const all = [done, dropOld, dropNew, open];
+		board.closedView = 'Done';
+		expect(board.laneTasks(all, 'Done').map((t) => t.id)).toEqual([1]);
+		board.closedView = 'Dropped';
+		expect(board.laneTasks(all, 'Done').map((t) => t.id)).toEqual([3, 2]);
+		// other lanes are unaffected by the toggle
+		expect(board.laneTasks(all, 'To Do').map((t) => t.id)).toEqual([4]);
+		board.closedView = 'Done';
 	});
 });

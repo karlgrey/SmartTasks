@@ -1,5 +1,5 @@
-import type { TaskDTO, UserDTO, ProjectDTO, LocationDTO, Status } from '$lib/types';
-import { STATUSES } from '$lib/types';
+import type { TaskDTO, UserDTO, ProjectDTO, LocationDTO, Status, ClosedStatus } from '$lib/types';
+import { STATUSES, isClosed } from '$lib/types';
 import { parseTicketQuery } from '$lib/ticket-query';
 import { todayInBerlin } from '$lib/date-utils';
 import { api } from './api';
@@ -28,6 +28,7 @@ type InitData = {
 	user: UserDTO;
 	tasks: TaskDTO[];
 	done: TaskDTO[];
+	dropped?: TaskDTO[];
 	counts?: Record<Status, number>;
 	users: UserDTO[];
 	projects: ProjectDTO[];
@@ -49,11 +50,13 @@ class BoardState {
 	flashes = $state<Record<number, boolean>>({});
 	lastDeletedId = $state<number | null>(null);
 	toasts = $state<{ id: number; message: string }[]>([]);
+	// Which closed status the Done lane shows: "Erledigt" (Done) or "Verworfen" (Dropped), #801.
+	closedView = $state<ClosedStatus>('Done');
 	#toastId = 0;
 
 	init(data: InitData) {
 		this.me = data.user;
-		this.tasks = [...data.tasks, ...data.done];
+		this.tasks = [...data.tasks, ...data.done, ...(data.dropped ?? [])];
 		this.counts = data.counts ?? zeroCounts();
 		this.users = data.users;
 		this.projects = data.projects;
@@ -95,7 +98,7 @@ class BoardState {
 					(!project || String(t.projectId) === project) &&
 					(!location ||
 						this.projects.find((p) => p.id === t.projectId)?.locationId === Number(location)) &&
-					(!today || (t.status !== 'Done' && t.dueDate !== null && t.dueDate <= todayStr!)) &&
+					(!today || (!isClosed(t.status) && t.dueDate !== null && t.dueDate <= todayStr!)) &&
 					(!q ||
 						t.title.toLowerCase().includes(q) ||
 						t.description.toLowerCase().includes(q) ||
@@ -105,6 +108,14 @@ class BoardState {
 								: String(t.id) === ticket.digits)))
 			)
 			.sort(compareTasks);
+	}
+
+	// Tasks of one board lane. The Done lane shows Done or Dropped depending on
+	// the toggle (Dropped has no column of its own), newest closed first.
+	laneTasks(filtered: TaskDTO[], status: Status): TaskDTO[] {
+		const shown = status === 'Done' ? this.closedView : status;
+		const inLane = filtered.filter((t) => t.status === shown);
+		return isClosed(shown) ? inLane.sort(compareDone) : inLane;
 	}
 
 	// Active board filters, mapped to field values for a new task — quick-add uses
@@ -173,18 +184,19 @@ class BoardState {
 		}
 	}
 
-	async loadMoreDone() {
-		const offset = this.tasks.filter((t) => t.status === 'Done').length;
-		const more = await api<TaskDTO[]>(`/api/tasks?status=Done&limit=50&offset=${offset}`);
+	async loadMoreClosed(status: ClosedStatus) {
+		const offset = this.tasks.filter((t) => t.status === status).length;
+		const more = await api<TaskDTO[]>(`/api/tasks?status=${status}&limit=50&offset=${offset}`);
 		for (const t of more) this.upsert(t);
 	}
 
 	async refetch() {
-		const [open, done] = await Promise.all([
+		const [open, done, dropped] = await Promise.all([
 			api<TaskDTO[]>('/api/tasks?open=true'),
-			api<TaskDTO[]>('/api/tasks?status=Done&limit=50')
+			api<TaskDTO[]>('/api/tasks?status=Done&limit=50'),
+			api<TaskDTO[]>('/api/tasks?status=Dropped&limit=50')
 		]);
-		this.tasks = [...open, ...done];
+		this.tasks = [...open, ...done, ...dropped];
 	}
 
 	connectSse(): () => void {

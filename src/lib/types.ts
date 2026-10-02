@@ -1,11 +1,19 @@
-// Order = board column order (and select/tab order). Icebox deliberately last.
+// Order = board column order (and select/tab order). Icebox deliberately last
+// among the columns; Dropped (#801) is a closed status without its own column —
+// it shows in the Done lane behind the "Erledigt | Verworfen" toggle.
 export const STATUSES = [
-	'Inbox', 'To Do', 'In Progress', 'Supplier', 'Review', 'Done', 'Icebox'
+	'Inbox', 'To Do', 'In Progress', 'Supplier', 'Review', 'Done', 'Icebox', 'Dropped'
 ] as const;
 export const PRIORITIES = ['Super-High', 'High', 'Medium', 'Low'] as const;
 export const SIZES = ['XS', 'S', 'M', 'L'] as const;
 
 export type Status = (typeof STATUSES)[number];
+
+// Closed = no longer open work: Done (erledigt) or Dropped (bewusst verworfen, #801).
+export const CLOSED_STATUSES = ['Done', 'Dropped'] as const satisfies readonly Status[];
+export type ClosedStatus = (typeof CLOSED_STATUSES)[number];
+export const isClosed = (s: Status): s is ClosedStatus => (CLOSED_STATUSES as readonly Status[]).includes(s);
+export const BOARD_STATUSES = STATUSES.filter((s) => s !== 'Dropped');
 export type Priority = (typeof PRIORITIES)[number];
 export type Size = (typeof SIZES)[number];
 

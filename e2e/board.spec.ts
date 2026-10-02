@@ -53,3 +53,35 @@ test('login → quick-add → drag → detail → comment', async ({ page }) => 
 	await expect(page.locator('.toast')).toHaveCount(0);
 	await expect(page).toHaveURL(/\/(\?.*)?$/);
 });
+
+test('verwerfen: Pflicht-Grund → Dropped, nur im Umschalter der Done-Spalte (#801)', async ({ page }) => {
+	await page.goto('/login');
+	await page.getByPlaceholder('Email').fill('micha@e2e.test');
+	await page.getByPlaceholder('Password').fill('e2e-password-1');
+	await page.getByRole('button', { name: 'Sign in' }).click();
+	await expect(page.locator('[data-column="Inbox"]')).toBeVisible();
+	// no own column for Dropped
+	await expect(page.locator('[data-column="Dropped"]')).toHaveCount(0);
+
+	const todo = page.locator('[data-column="To Do"]');
+	await todo.getByPlaceholder('Add task…').fill('Obsolete idea');
+	await todo.getByPlaceholder('Add task…').press('Enter');
+	await todo.locator('.card', { hasText: 'Obsolete idea' }).click();
+	await expect(page).toHaveURL(/\/task\/\d+/);
+
+	await page.getByRole('button', { name: '⊘ Verwerfen' }).click();
+	const confirm = page.getByRole('button', { name: 'Verwerfen', exact: true });
+	await expect(confirm).toBeDisabled(); // Grund ist Pflicht
+	await page.getByLabel('Grund fürs Verwerfen').fill('Icebox-Sweep Q4 2026');
+	await confirm.click();
+	await expect(page.locator('.comments').getByText('Verworfen: Icebox-Sweep Q4 2026')).toBeVisible();
+	await expect(page.getByLabel('Status')).toHaveValue('Dropped');
+	await page.keyboard.press('Escape');
+
+	const done = page.locator('[data-column="Done"]');
+	await expect(page.locator('.card', { hasText: 'Obsolete idea' })).toHaveCount(0);
+	await done.getByRole('button', { name: 'Verworfen' }).click();
+	await expect(done.locator('.card.dropped', { hasText: 'Obsolete idea' })).toBeVisible();
+	await done.getByRole('button', { name: 'Erledigt' }).click();
+	await expect(page.locator('.card', { hasText: 'Obsolete idea' })).toHaveCount(0);
+});
