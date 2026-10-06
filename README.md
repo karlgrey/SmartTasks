@@ -47,6 +47,12 @@ Ship an update:
 
 	ssh deploy@labs.remoterepublic.com '/opt/smarttasks/scripts/deploy-vps.sh'
 
+Env check (#797): before the build, both `deploy.sh` and `scripts/deploy-vps.sh`
+run `sh scripts/env-check.sh .env.example --systemd smarttasks.service`, comparing
+only the key NAMES in `.env.example` (the contract) with the unit's `Environment=`.
+A missing key aborts the deploy; a new key goes into `.env.example` and the unit
+(`systemctl edit smarttasks` + `daemon-reload`) before deploying.
+
 ### Photo attachments (v1.3)
 
 - Files live in `<dirname(DATABASE_PATH)>/uploads/` (prod: `/opt/smarttasks/data/uploads/`).
