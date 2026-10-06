@@ -748,5 +748,5 @@ git commit -m "test: e2e photo upload flow; docs: ops notes for uploads"
 1. `ssh deploy@labs.remoterepublic.com`, then:
    - `sudo systemctl edit smarttasks` → add `[Service]` / `Environment=BODY_SIZE_LIMIT=6M`
    - extend the backup cron to also archive `/opt/smarttasks/data/uploads/` (same 14-day rotation)
-2. Push main, run `/opt/smarttasks/scripts/deploy-vps.sh` (daemon-reload happens via restart? No — `sudo systemctl daemon-reload` is needed after the unit edit, then deploy).
+2. Push main, deploy (`./deploy.sh`) (daemon-reload happens via restart? No — `sudo systemctl daemon-reload` is needed after the unit edit, then deploy).
 3. Smoke test on the phone: open a task → add photo via camera → thumbnail appears; check `data/uploads/` on the server.

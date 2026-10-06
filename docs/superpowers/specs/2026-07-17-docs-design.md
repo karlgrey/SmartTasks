@@ -146,7 +146,7 @@ both; out of scope for v1.4.)
 
 - Additive migration only; applied automatically on boot by `createDb`
   (`migrate(...)` runs the `drizzle/` folder). No manual SQL needed — a normal
-  `scripts/deploy-vps.sh` pull + restart applies `0004_documents`.
+  deploy (pull + restart) applies `0004_documents`.
 - No new env vars, no new on-disk assets (docs are pure DB rows). Nightly SQLite
   backup already covers the new tables.
 

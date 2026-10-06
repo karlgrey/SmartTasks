@@ -200,17 +200,6 @@ function codeLines(path: string): string[] {
 }
 
 describe('Deploy-Skripte rufen den Env-Check auf (#797)', () => {
-	it('scripts/deploy-vps.sh: nach git pull, vor npm install / build / restart', () => {
-		const lines = codeLines('scripts/deploy-vps.sh');
-		const idx = (re: RegExp) => lines.findIndex((l) => re.test(l));
-		const check = idx(/^sh scripts\/env-check\.sh \.env\.example --systemd smarttasks\.service$/);
-		expect(check).toBeGreaterThan(-1);
-		expect(check).toBeGreaterThan(idx(/^git pull --ff-only/));
-		expect(check).toBeLessThan(idx(/^npm install/));
-		expect(check).toBeLessThan(idx(/^npm run build/));
-		expect(check).toBeLessThan(idx(/systemctl restart/));
-	});
-
 	it('deploy.sh (Server-Teil): nach git pull, vor npm install / build / restart', () => {
 		const lines = codeLines('deploy.sh');
 		const idx = (re: RegExp) => lines.findIndex((l) => re.test(l));

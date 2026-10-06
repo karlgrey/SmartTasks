@@ -23,12 +23,6 @@ function sudoSystemctlCommands(path: string, vars: Record<string, string> = {}):
 }
 
 describe('Deploy-Skripte vs. sudoers (#803)', () => {
-	it('scripts/deploy-vps.sh startet den Dienst in exakt der erlaubten Form neu', () => {
-		const cmds = sudoSystemctlCommands('scripts/deploy-vps.sh');
-		expect(cmds.length).toBeGreaterThan(0);
-		for (const c of cmds) expect(c).toMatch(ALLOWED);
-	});
-
 	it('deploy.sh startet den Dienst in exakt der erlaubten Form neu', () => {
 		const src = readFileSync('deploy.sh', 'utf8');
 		const service = src.match(/SERVICE="\$\{SERVICE:-([^}]+)\}"/)?.[1];

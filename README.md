@@ -43,11 +43,16 @@ Production runs at https://tasks.remoterepublic.com on the labs VPS:
 (14-day rotation). The server pulls from the public GitHub repo via https —
 no deploy key.
 
-Ship an update:
+Ship an update — exactly two ways:
 
-	ssh deploy@labs.remoterepublic.com '/opt/smarttasks/scripts/deploy-vps.sh'
+- Laptop: `./deploy.sh` (SSH as `deploy`).
+- labs: `sudo -n -u deploy /usr/local/bin/claude-deploy smarttasks` (source:
+  `tools/labs/claude-deploy.sh` in TheBrain2; pull, build, restart, health check).
 
-Env check (#797): before the build, both `deploy.sh` and `scripts/deploy-vps.sh`
+Both require the trailer `Review-Gate: Fable (...)` on the latest main commit;
+without it the deploy aborts (tripwire, exit 3 in `claude-deploy`).
+
+Env check (#797): before the build, both `deploy.sh` and `claude-deploy`
 run `sh scripts/env-check.sh .env.example --systemd smarttasks.service`, comparing
 only the key NAMES in `.env.example` (the contract) with the unit's `Environment=`.
 A missing key aborts the deploy; a new key goes into `.env.example` and the unit
