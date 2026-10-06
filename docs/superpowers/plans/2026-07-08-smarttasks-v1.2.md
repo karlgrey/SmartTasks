@@ -504,4 +504,4 @@ git add -A && git commit -m "test: e2e covers status history and delete flow"
 
 ## Post-plan verification
 
-`npx vitest run && npm run check && npm run build && npm run test:e2e` all green; then deploy via `ssh deploy@labs.remoterepublic.com '/opt/smarttasks/scripts/deploy-vps.sh'` (the new migration applies automatically at service restart).
+`npx vitest run && npm run check && npm run build && npm run test:e2e` all green; then deploy via `./deploy.sh` (the new migration applies automatically at service restart).
