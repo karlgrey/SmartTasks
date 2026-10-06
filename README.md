@@ -52,8 +52,8 @@ Ship an update — exactly two ways:
 Both require the trailer `Review-Gate: Fable (...)` on the latest main commit;
 without it the deploy aborts (tripwire, exit 3 in `claude-deploy`).
 
-Env check (#797): before the build, `deploy.sh`
-runs `sh scripts/env-check.sh .env.example --systemd smarttasks.service`, comparing
+Env check (#797): before the build, both `deploy.sh` and `claude-deploy`
+run `sh scripts/env-check.sh .env.example --systemd smarttasks.service`, comparing
 only the key NAMES in `.env.example` (the contract) with the unit's `Environment=`.
 A missing key aborts the deploy; a new key goes into `.env.example` and the unit
 (`systemctl edit smarttasks` + `daemon-reload`) before deploying.
