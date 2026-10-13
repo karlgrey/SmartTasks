@@ -19,6 +19,7 @@ COPY --from=build /app/src ./src
 COPY litestream.yml /etc/litestream.yml
 COPY docker-entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
-ENV NODE_ENV=production DATABASE_PATH=/data/smarttasks.db PORT=3000
+# HOST=0.0.0.0: im Container auf allen Interfaces lauschen (Code-Default ist 127.0.0.1, #879)
+ENV NODE_ENV=production DATABASE_PATH=/data/smarttasks.db PORT=3000 HOST=0.0.0.0
 EXPOSE 3000
 ENTRYPOINT ["/entrypoint.sh"]

@@ -4,6 +4,13 @@ import { resolveUser } from '$lib/server/auth';
 import { tickRoutines } from '$lib/server/routines-service';
 import { emit } from '$lib/server/events';
 import { todayInBerlin } from '$lib/date-utils';
+import { applyDefaultListenHost } from '$lib/server/listen-host';
+
+// #879: Server lauscht per Default nur auf 127.0.0.1 — Caddy ist der einzige
+// öffentliche Eingang. Wirkt, weil adapter-node die Hooks im handler.js-Init
+// (top-level `await server.init`) lädt, bevor index.js HOST liest.
+// Verifikation nach Deploy: `ss -tlnp | grep 3020`.
+applyDefaultListenHost(process.env);
 
 // Routinen-Scheduler (#795): einmal je Berlin-Kalendertag, ausgelöst vom ersten
 // authentifizierten Request. Fehler dürfen nie den Request brechen.
