@@ -43,6 +43,9 @@ Production runs at https://tasks.remoterepublic.com on the labs VPS:
 (14-day rotation). The server pulls from the public GitHub repo via https —
 no deploy key.
 
+The server listens only on 127.0.0.1:3020 by default (`HOST` default in code, #879);
+Caddy is the only public entry point.
+
 Ship an update — exactly two ways:
 
 - Laptop: `./deploy.sh` (SSH as `deploy`).
