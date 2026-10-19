@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
 import {
 	createRoutine,
@@ -24,6 +24,10 @@ import { todayInBerlin } from '$lib/date-utils';
 import { addDays, endOfIsoWeek } from '$lib/rhythm';
 import type { Rhythm } from '$lib/types';
 
+// Feste Referenzzeit (#900): MONTHLY nutzt dayOfMonth 15, die Erwartungen hingen am Kalendertag.
+// Nur Date faken, damit todayInBerlin() im Service und in den Tests deterministisch ist.
+vi.useFakeTimers({ toFake: ['Date'] });
+vi.setSystemTime(new Date('2026-10-19T12:00:00+02:00'));
 const today = todayInBerlin();
 const MONTHLY: Rhythm = { unit: 'month', interval: 1, dayOfMonth: 15 };
 const DAILY: Rhythm = { unit: 'day', interval: 1 };
