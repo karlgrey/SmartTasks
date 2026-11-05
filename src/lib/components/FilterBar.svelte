@@ -86,11 +86,6 @@
 		});
 	}
 
-	function toggleAssignee(id: number) {
-		const val = String(id);
-		setParam('assignee', current.get('assignee') === val ? null : val);
-	}
-
 	function toggleToday() {
 		setParam('today', current.get('today') === 'true' ? null : 'true');
 	}
@@ -100,17 +95,12 @@
 	<strong>SmartTasks</strong>
 	<a class="docs-link" href="/docs">Docs</a>
 	<a class="docs-link" href="/routines">Routinen</a>
-	{#each board.users as u (u.id)}
-		<button
-			class="chip"
-			class:active={current.get('assignee') === String(u.id)}
-			style="--c:{u.color}"
-			data-user-id={u.id}
-			onclick={() => toggleAssignee(u.id)}
-		>
-			{u.name}{#if u.type === 'ai'}<span class="ai">AI</span>{/if}
-		</button>
-	{/each}
+	<select onchange={(e) => setParam('assignee', e.currentTarget.value || null)}>
+		<option value="">Alle Personen</option>
+		{#each board.users as u (u.id)}
+			<option value={u.id} data-user-id={u.id} selected={current.get('assignee') === String(u.id)}>{u.name}{u.type === 'ai' ? ' (AI)' : ''}</option>
+		{/each}
+	</select>
 	<select onchange={(e) => setParam('project', e.currentTarget.value || null)}>
 		<option value="">All projects</option>
 		{#each board.projects.filter((p) => !p.archived) as p (p.id)}
@@ -155,8 +145,13 @@
 				headers: { 'x-logout-source': 'filterbar-confirmed' }
 			});
 			location.href = '/login';
-		}}>Logout</button
+		}}
+		aria-label="Logout"
+		title="Logout"
 	>
+		<!-- Log-out-Symbol -->
+		<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg>
+	</button>
 </nav>
 
 <dialog bind:this={pwDialog} class="pw-dialog">
@@ -215,11 +210,6 @@
 		background: color-mix(in srgb, var(--c) 15%, transparent);
 		font-weight: 600;
 	}
-	.ai {
-		margin-left: 4px;
-		font-size: 10px;
-		color: var(--muted);
-	}
 	.docs-link {
 		color: var(--accent);
 		text-decoration: none;
@@ -248,10 +238,16 @@
 		text-decoration: underline;
 	}
 	.logout {
+		display: inline-flex;
+		align-items: center;
+		padding: 2px;
 		border: 0;
 		background: none;
 		color: var(--muted);
 		cursor: pointer;
+	}
+	.logout:hover {
+		color: inherit;
 	}
 	@media (max-width: 767px) {
 		nav {
