@@ -58,14 +58,6 @@ textarea {
 	font-weight: 700;
 }
 
-/* Alt-User "TheBrain2" (id 5, stillgelegt, Task #216): aus Auswahl-/Filter-UI
-   ausblenden. User bleibt in der DB (hängt an Historie-Einträgen vom 08.07.) -
-   betroffen sind nur Picker-Listen (Filter-Chips, Assignee-Dropdown), nicht
-   Historie/Kommentare, die den Namen weiterhin per Lookup anzeigen. */
-[data-user-id="5"] {
-	display: none;
-}
-
 /* iOS-Auto-Zoom-Fix (Task #257): Safari/iOS zoomt beim Fokussieren von
    Eingabefeldern mit font-size < 16px dauerhaft in die Seite (Beschreibung
    bearbeiten -> View bleibt ~10% zu groß). Deshalb bekommen ALLE
