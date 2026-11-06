@@ -87,6 +87,10 @@ Add a user / rotate an agent key (on the server, with the production DATABASE_PA
 	npx tsx scripts/create-user.ts <name> <email> [color]
 	npx tsx scripts/create-api-key.ts <user-name>
 
+Merge a user into another (re-points all rows, deletes the old user's API keys/sessions and the old user; back up the DB first, `--dry-run` previews):
+
+	npx tsx scripts/merge-user.ts <from-id> <to-id> [--dry-run]
+
 The repo also ships Docker/Fly.io/Litestream files (`Dockerfile`, `fly.toml`,
 `litestream.yml`) as an alternative container path; they are not used by the
 VPS setup.
