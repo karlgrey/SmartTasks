@@ -69,6 +69,8 @@ export function mergeUser(db: Db, fromId: number, toId: number, opts: { dryRun?:
 	}
 
 	c.transaction(() => {
+		// Vorher-Zähler im echten Lauf erst in der Transaktion erheben (App schreibt parallel).
+		result.columns.forEach((r, i) => (r.before = count(cols[i])));
 		for (const col of cols) {
 			if (DELETE_TABLES.has(col.table)) {
 				c.prepare(`DELETE FROM ${q(col.table)} WHERE ${q(col.column)} = ?`).run(fromId);
